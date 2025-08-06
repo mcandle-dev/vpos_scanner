@@ -1,4 +1,4 @@
-package com.example.test1;
+package com.mcandle.bledemo;
 
 import android.content.SharedPreferences;
 import android.util.Log;
@@ -55,6 +55,7 @@ public class BleScan {
     public String getDeviceMacAddress() {
         String[] macAddress = new String[1];
         int ret = At.Lib_GetAtMac(macAddress);
+        Log.d("BLE_SCAN", "Device MAC Address: " + macAddress[0]);
         return (ret == 0) ? macAddress[0] : null;
     }
 
@@ -89,7 +90,7 @@ public class BleScan {
 
         ret = At.Lib_AtStartNewScan(
                 sp.getString("macAddress", ""),
-                sp.getString("broadcastName", ""),
+                sp.getString("broadcastName", "mcan"),
                 -Integer.parseInt(sp.getString("rssi", "0")),
                 sp.getString("manufacturerId", ""),
                 sp.getString("data", "")

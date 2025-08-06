@@ -1,0 +1,76 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="#FFFFFF"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:gravity="center_horizontal">
+
+    <!-- 타이틀 -->
+    <TextView
+        android:id="@+id/tvTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="결제 방법 선택"
+        android:textStyle="bold"
+        android:textColor="#212121"
+        android:textSize="20sp"
+        android:gravity="center"
+        android:layout_marginBottom="18dp"/>
+
+    <!-- 카드번호 -->
+    <TextView
+        android:id="@+id/tvCardNumber"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="1234-4567-5678-1223"
+        android:textStyle="bold"
+        android:textColor="#212121"
+        android:textSize="18sp"
+        android:gravity="center"
+        android:layout_marginBottom="6dp"/>
+
+    <!-- 전화번호 -->
+    <TextView
+        android:id="@+id/tvPhone"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="****-2200"
+        android:textColor="#888888"
+        android:textSize="16sp"
+        android:gravity="center"
+        android:layout_marginBottom="18dp"/>
+
+    <!-- Mobile Payment 버튼 -->
+    <Button
+        android:id="@+id/btnOfflinePayment"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="OffLine Payment"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/btn_dark_rounded"
+        android:layout_marginBottom="10dp"/>
+
+    <!-- 주문번호 입력 -->
+    <EditText
+        android:id="@+id/etOrderNumber"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:hint="Order Number"
+        android:background="#F5F5F5"
+        android:padding="14dp"
+        android:textColor="#212121"
+        android:textColorHint="#888888"
+        android:layout_marginBottom="12dp"/>
+
+    <!-- Offline Payment 버튼 -->
+    <Button
+        android:id="@+id/btnMobilePayment"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="Mobile Payment"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/btn_dark_rounded" />
+</LinearLayout>

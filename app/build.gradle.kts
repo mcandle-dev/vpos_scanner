@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.test1"
+    namespace = "com.mcandle.bledemo"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.test1"
+        applicationId = "com.mcandle.bledemo"
         minSdk = 24
         targetSdk = 35
         versionCode = 1

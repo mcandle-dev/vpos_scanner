@@ -1,36 +1,85 @@
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
-    android:layout_width="wrap_content"
+    android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    tools:context=".MainActivity">
+    tools:context="com.mcandle.bledemo.MainActivity">
 
+    <!-- 1번째 줄: Master, Scan, ComRev (여백) -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="horizontal">
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingTop="24dp">
 
         <Button
             android:id="@+id/btn1"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="Master" />
+            android:layout_weight="1"
+            android:text="Master"
+            android:layout_marginEnd="8dp"/>
 
         <Button
             android:id="@+id/btn2"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="Scan" />
+            android:layout_weight="1"
+            android:text="Scan"
+            android:layout_marginEnd="8dp"
+            android:layout_marginStart="8dp"/>
 
         <Button
             android:id="@+id/btn3"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="ComRev" />
+            android:text="ComRev"
+            android:layout_marginStart="8dp"/>
     </LinearLayout>
 
+    <!-- 2번째 줄: Config (가로 3등분 가운데 1번째만 버튼, 나머지는 View로 공간만 차지) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingTop="16dp">
+
+        <Button
+            android:id="@+id/btn_config"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Config"
+            android:layout_marginEnd="8dp"/>
+
+
+        <Button
+            android:id="@+id/btn_advertise"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Advertise"
+            android:layout_marginEnd="8dp"
+            android:layout_marginStart="8dp"/>
+
+        <!-- 공간 채우기용 View들 -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1"/>
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#F5F5F5"
+        android:padding="16dp"
+        android:scrollbars="vertical"/>
 </LinearLayout>
+

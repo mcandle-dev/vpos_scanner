@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="10dp">
+
+    <!-- 1번째 라인: Device Name -->
+    <TextView
+        android:id="@+id/deviceName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#000000"
+        android:text="" />
+
+    <!-- 2번째 라인: Address (좌측), RSSI (우측) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <!-- Address (Left-aligned) -->
+        <TextView
+            android:id="@+id/deviceAddress"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="16sp"
+            android:textColor="#000000"
+            android:text="00:11:22:33:44:55" />
+
+        <!-- RSSI with Icon (Right-aligned) -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <ImageView
+                android:id="@+id/deviceRssiIcon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/round_signal_cellular_alt_24"
+                android:contentDescription="Signal Strength" />
+
+            <TextView
+                android:id="@+id/deviceRssi"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="end"
+                android:textSize="16sp"
+                android:textColor="#000000"
+                android:text="-50" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 3번째 라인: Tx Power -->
+    <TextView
+        android:id="@+id/tvTxPower"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Tx Power: N/A"
+        android:visibility="gone"/>
+
+    <!-- 4번째 라인: Bond State -->
+    <TextView
+        android:id="@+id/tvBondState"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Bond State: None"
+        android:visibility="gone"/>
+
+    <!-- 5번째 라인: Manufacturer Data -->
+    <TextView
+        android:id="@+id/tvManufacturerData"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Manufacturer Data: N/A"
+        android:visibility="gone"/>
+
+    <!-- 6번째 라인: Service UUIDs -->
+    <TextView
+        android:id="@+id/tvServiceUUIDs"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Service UUIDs: N/A"
+        android:visibility="gone"/>
+
+    <!-- 7번째 라인: Service Data -->
+    <TextView
+        android:id="@+id/tvServiceData"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Service Data: N/A"
+        android:visibility="gone"/>
+
+    <!-- Divider Line -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#CCCCCC"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"/>
+</LinearLayout>
