@@ -44,6 +44,7 @@ class MainActivity : AppCompatActivity() {
     private var mStartFlag = false
     private var mEnableFlag = true
 
+
     private val deviceList = mutableListOf<DeviceModel>()
     private lateinit var adapter: BLEDeviceAdapter
 
@@ -253,7 +254,11 @@ class MainActivity : AppCompatActivity() {
                 ?: ""
         }(device.serviceUuids)
 
-        val orderNumber = phoneNumber ?: "1234"
+        val orderNumber = { addr: String? ->
+            addr?.filter(Char::isDigit)  // 숫자만 남기기
+                ?.take(8)                // 다음 4자리만
+                ?: "12345678"
+        }(device.serviceUuids)
 
         val dialogView = layoutInflater.inflate(R.layout.dialog_payment_info, null)
         val tvCardNumber = dialogView.findViewById<TextView>(R.id.tvCardNumber)
@@ -302,7 +307,13 @@ class MainActivity : AppCompatActivity() {
                         // ✔ UI에서 안전하게 다이얼로그 띄우기
                         BLEAdvertiseDialogFragment().show(supportFragmentManager, "BLE_ADVERTISE")
                     } else {
-                        SendPromptMsg("Config beacon failed, return: $ret\n")
+                        SendPromptMsg(
+                            "Config beacon failed, return: $ret\n" +
+                                    "Company ID: 0x${beacon.companyId}\n" +
+                                    "Major: 0x${beacon.major}\n" +
+                                    "Minor: 0x${beacon.minor}\n" +
+                                    "Custom UUID: 0x${beacon.customUuid}\n"
+                        )
                     }
                 }
             }.start()
@@ -421,6 +432,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     public fun sendAdvertise() {
+
+        // 확인사항 -2500 오류 방지를 위해서 advertise 전에 scan을 멈추고 시작
+        toggleScan()
+
         var ret = 0
         ret = At.Lib_EnableBeacon(true)
         Log.d("MainActivity", "sendAdvertise-ret: " + ret)

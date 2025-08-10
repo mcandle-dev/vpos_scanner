@@ -70,42 +70,6 @@ public class BleScan {
         return ret;
     }
 
-//    public void startScanAsync(SharedPreferences prefs, ScanResultListener listener) {
-//        // 실제 BLE 스캔 코드 대신 하드코딩된 BLE 기기 정보 전달
-//        try {
-//            JSONArray scanData = new JSONArray();
-//
-//            JSONObject device1 = new JSONObject();
-//            device1.put("name", "mcandle");
-//            device1.put("address", "69:DA:0F:FF:7A:B8");
-//            device1.put("rssi", -70);
-//            device1.put("txPower",  1);
-//            device1.put("serviceUuids","10 FE 31 32 33 34 35 36 37 38 39 30 31 32 33 34 35 36 59 ");
-//            scanData.put(device1);
-//
-//            JSONObject device2 = new JSONObject();
-//            device2.put("name", "Test Beacon 2");
-//            device2.put("address", "11:22:33:44:55:62");
-//            device2.put("rssi", -70);
-//            scanData.put(device2);
-//
-//            JSONObject device3 = new JSONObject();
-//            device3.put("name", "Test Beacon 3");
-//            device3.put("address", "11:22:33:44:55:63");
-//            device3.put("rssi", -65);
-//            scanData.put(device3);
-//
-//            // 필요하면 더 추가
-//
-//            // 콜백에 전달 (실제 BLE와 동일하게)
-//            if (listener != null) {
-//                listener.onScanResult(scanData);
-//            }
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-//    }
-
     public void startScanAsync(SharedPreferences sp, ScanResultListener listener) {
         startScan(sp, listener);
         if (isScanning) {
