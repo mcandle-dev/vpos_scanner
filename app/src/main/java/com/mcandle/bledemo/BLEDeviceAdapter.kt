@@ -41,14 +41,15 @@ class BLEDeviceAdapter(
         holder.txPowerTextView.text = "TX : ${device.txPower ?: "N/A"} dBm"
         holder.txPowerTextView.visibility = if (device.txPower != null) View.VISIBLE else View.GONE
 
-        holder.manufacturerDataTextView.text = "Manufacturer Data: ${device.manufacturerData?.let { device.getManufacturerDataHex() } ?: "N/A"}"
+        holder.manufacturerDataTextView.text = "Manufacturer Data: ${device.getManufacturerDataHex().ifEmpty { "N/A" }}"
         holder.manufacturerDataTextView.visibility = if (device.manufacturerData.isNotEmpty()) View.VISIBLE else View.GONE
 
-        holder.serviceUuidsTextView.text = "UUIDs: ${device.serviceUuids.joinToString()}"
+        holder.serviceUuidsTextView.text = "UUID: ${device.serviceUuids.ifEmpty { "N/A" }}"
         holder.serviceUuidsTextView.visibility = if (device.serviceUuids.isNotEmpty()) View.VISIBLE else View.GONE
 
-        holder.serviceDataTextView.text = "Service Data: ${device.serviceData?.let { device.getServiceDataHex() } ?: "N/A"}"
+        holder.serviceDataTextView.text = "Service Data: ${device.getServiceDataHex().ifEmpty { "N/A" }}"
         holder.serviceDataTextView.visibility = if (device.serviceData.isNotEmpty()) View.VISIBLE else View.GONE
+
 
         val context = holder.itemView.context
         val grayColor = ContextCompat.getColor(context, R.color.gray)

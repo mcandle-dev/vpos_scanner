@@ -70,6 +70,42 @@ public class BleScan {
         return ret;
     }
 
+//    public void startScanAsync(SharedPreferences prefs, ScanResultListener listener) {
+//        // 실제 BLE 스캔 코드 대신 하드코딩된 BLE 기기 정보 전달
+//        try {
+//            JSONArray scanData = new JSONArray();
+//
+//            JSONObject device1 = new JSONObject();
+//            device1.put("name", "mcandle");
+//            device1.put("address", "69:DA:0F:FF:7A:B8");
+//            device1.put("rssi", -70);
+//            device1.put("txPower",  1);
+//            device1.put("serviceUuids","10 FE 31 32 33 34 35 36 37 38 39 30 31 32 33 34 35 36 59 ");
+//            scanData.put(device1);
+//
+//            JSONObject device2 = new JSONObject();
+//            device2.put("name", "Test Beacon 2");
+//            device2.put("address", "11:22:33:44:55:62");
+//            device2.put("rssi", -70);
+//            scanData.put(device2);
+//
+//            JSONObject device3 = new JSONObject();
+//            device3.put("name", "Test Beacon 3");
+//            device3.put("address", "11:22:33:44:55:63");
+//            device3.put("rssi", -65);
+//            scanData.put(device3);
+//
+//            // 필요하면 더 추가
+//
+//            // 콜백에 전달 (실제 BLE와 동일하게)
+//            if (listener != null) {
+//                listener.onScanResult(scanData);
+//            }
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+//    }
+
     public void startScanAsync(SharedPreferences sp, ScanResultListener listener) {
         startScan(sp, listener);
         if (isScanning) {
@@ -77,6 +113,7 @@ public class BleScan {
         }
     }
     public void startScan(SharedPreferences sp, ScanResultListener listener) {
+
         if (isScanning) return;
         isScanning = true;
 
@@ -87,10 +124,12 @@ public class BleScan {
             Log.e(TAG, "Failed to enable master mode" + ret);
             return;
         }
+        String mac = getDeviceMacAddress();
+        Log.d("MainActivity", "mac: " + mac);
 
         ret = At.Lib_AtStartNewScan(
                 sp.getString("macAddress", ""),
-                sp.getString("broadcastName", "mcan"),
+                sp.getString("broadcastfName", "MCan"),
                 -Integer.parseInt(sp.getString("rssi", "0")),
                 sp.getString("manufacturerId", ""),
                 sp.getString("data", "")
@@ -112,33 +151,6 @@ public class BleScan {
         Log.e(TAG, "BLE scan stopped");
     }
 
-    public void ComRecvAT() {  // 테스트 용도
-        byte[] recvData = new byte[2048];
-        int[] recvDataLen = new int[2];
-
-        Log.e("TAG", "ComRecvAT 시작");
-
-        isScanning = true;
-        while (isScanning) {
-
-            int ret = At.Lib_ComRecvAT(recvData, recvDataLen, 20, 1000);
-            Log.e("TAG", "runLib_ComRecvAT: recvDataLen " + recvDataLen[0]);
-            Log.e("TAG", "Lib_ComRecvAT recvData: " + bytesToHex(recvData, recvDataLen[0]));
-            String buff= new String(recvData, 0, recvDataLen[0]);
-
-            // 콜백이 등록되어 있으면 MainActivity로 데이터 전달
-            if (dataReceiveListener != null) {
-                dataReceiveListener.onDataReceived(buff);
-            }
-
-            try {
-                Thread.sleep(2000); // 2초 대기
-            } catch (InterruptedException e) {
-                Log.e("TAG", "Sleep interrupted", e);
-                Thread.currentThread().interrupt();
-            }
-        }
-    }
     public void recvScanData(ScanResultListener listener) {
         byte[] recvData =new byte[2048];
         int[] recvDataLen =new int[2];
@@ -147,8 +159,8 @@ public class BleScan {
 
         while (isScanning) {
             int ret = At.Lib_ComRecvAT(recvData, recvDataLen, 20, 1000);
-            Log.e("TAG", "runLib_ComRecvAT: recvDataLen"+recvDataLen[0] );
-            Log.e("TAG", "Lib_ComRecvAT recvData: "+bytesToHex(recvData,recvDataLen[0]));
+            Log.e("recvScanData", "runLib_ComRecvAT: recvDataLen"+recvDataLen[0] );
+            Log.e("recvScanData", "Lib_ComRecvAT recvData: "+bytesToHex(recvData,recvDataLen[0]));
             Map<String, JSONObject> deviceMap = new ConcurrentHashMap<>();
             boolean startProcessing = false;
 
@@ -185,9 +197,11 @@ public class BleScan {
                         Log.e("TAG", "Invalid RSSI value: " + rssi);
                         continue;
                     }
-                    String payload = parts[2].split(":",2)[1].trim();
-                    if((payload.length()>62)||(payload.length()%2!=0))
-                        continue;
+
+                    String[] payloadArr = parts[2].split(":",2);
+                    if (payloadArr.length < 2) continue;;
+                    String payload = payloadArr[1].trim();
+                    if((payload.length()>62)||(payload.length()%2!=0)) continue;
 //                        Log.e("TAG", "debug crash position:echo20" );
                     JSONObject device;
                     if (deviceMap.containsKey(mac)) {
@@ -254,10 +268,14 @@ public class BleScan {
                     continue;
                 }
 
+                Log.e("deviceMap", "deviceMap" + deviceMap );
+
                 synchronized (deviceMap) {
                     Map<String, JSONObject> snapshot = new HashMap<>(deviceMap); // 복사본 생성
                     JSONArray resultArray = new JSONArray(snapshot.values());
+                    Log.e("resultArray", "resultArray" + resultArray );
                     if (listener != null) {
+                        Log.e("listener", "resultArray" + resultArray );
                         listener.onScanResult(resultArray);
                     }
                 }
@@ -293,83 +311,92 @@ public class BleScan {
 //        Map<String, String> parsedData = new HashMap<>();
 //        byte[] advertisementData =new byte[advertiseData.length()/2];
         JSONObject parsedData = new JSONObject();
+        if (advertisementData == null || advertisementData.length == 0) return parsedData;
+        Log.d("parseAdvertisementData", "advertisementData: " + bytesToHex(advertisementData));
         int offset = 0;
-        while (offset < advertisementData.length) {
-            int length = advertisementData[offset++] & 0xFF;
-            if (length == 0) break;
+        try {
+            while (offset < advertisementData.length) {
+                int length = advertisementData[offset++] & 0xFF;
+                if (length == 0) break;
 
-            int type = advertisementData[offset] & 0xFF;
-            offset++;
+                int type = advertisementData[offset] & 0xFF;
+                offset++;
 
-            byte[] data = new byte[length - 1];
-            if(length-1>advertisementData.length-offset)//data format issue.
-            {
-                return null;
-            }
-            System.arraycopy(advertisementData, offset, data, 0, length - 1);
-            offset += length - 1;
+                byte[] data = new byte[length - 1];
+                if (length - 1 > advertisementData.length - offset)//data format issue.
+                {
+                    return null;
+                }
+                System.arraycopy(advertisementData, offset, data, 0, length - 1);
+                offset += length - 1;
 
-            switch (type) {
-                case 0x01: // Flags
-                    parsedData.put("Flags", bytesToHex(data));
-                    break;
-                case 0x02: // Incomplete List of 16-bit Service Class UUIDs
-                case 0x03: // Complete List of 16-bit Service Class UUIDs
-                    parsedData.put("Service UUIDs", bytesToHex(data));
-                    break;
-                case 0x04: // Incomplete List of 32-bit Service Class UUIDs
-                case 0x05: // Complete List of 32-bit Service Class UUIDs
-                    parsedData.put("Service UUIDs", bytesToHex(data));
-                    break;
-                case 0x06: // Incomplete List of 128-bit Service Class UUIDs
-                case 0x07: // Complete List of 128-bit Service Class UUIDs
-                    parsedData.put("Service UUIDs", bytesToHex(data));
-                    break;
-                case 0x08: // Shortened Local Name
-                case 0x09: // Complete Local Name
-                    parsedData.put("Device Name", new String(data));
-                    break;
-                case 0x0A: // Complete Local Name
+                switch (type) {
+                    case 0x01: // Flags
+                        parsedData.put("Flags", bytesToHex(data));
+                        break;
+                    case 0x02: // Incomplete List of 16-bit Service Class UUIDs
+                    case 0x03: // Complete List of 16-bit Service Class UUIDs
+                        parsedData.put("Service UUIDs", bytesToHex(data));
+                        break;
+                    case 0x04: // Incomplete List of 32-bit Service Class UUIDs
+                    case 0x05: // Complete List of 32-bit Service Class UUIDs
+                        parsedData.put("Service UUIDs", bytesToHex(data));
+                        break;
+                    case 0x06: // Incomplete List of 128-bit Service Class UUIDs
+                    case 0x07: // Complete List of 128-bit Service Class UUIDs
+                        parsedData.put("Service UUIDs", uuid128LeToString(data));
+                        break;
+                    case 0x08: // Shortened Local Name
+                    case 0x09: // Complete Local Name
+                        parsedData.put("Device Name", new String(data));
+                        break;
+                    case 0x0A: // Complete Local Name
 //                    byte [] tx_power=hexStringToByteArray(new String(data));
-                    parsedData.put("TX Power Level", data[0]);
-                    break;
-                case 0xFF: // Manufacturer Specific Data
-                    parsedData.put("Manufacturer Data", bytesToHex(data));
-                    break;
+                        parsedData.put("TX Power Level", data[0]);
+                        break;
+                    case 0xFF: // Manufacturer Specific Data
+                        parsedData.put("Manufacturer Data", bytesToHex(data));
+                        break;
 
-                case 0x16: // Service Data - 16-bit UUID
-                    if (data.length >= 2) {
-                        String uuid16 = String.format("%04X", ((data[1] & 0xFF) << 8) | (data[0] & 0xFF));
-                        byte[] serviceData = Arrays.copyOfRange(data, 2, data.length);
-                        addServiceData(parsedData, uuid16, serviceData);
-                    }
-                    break;
-                case 0x20: // Service Data - 32-bit UUID
-                    if (data.length >= 4) {
-                        String uuid32 = String.format("%08X",
-                                ((data[3] & 0xFF) << 24) | ((data[2] & 0xFF) << 16) | ((data[1] & 0xFF) << 8) | (data[0] & 0xFF));
-                        byte[] serviceData = Arrays.copyOfRange(data, 4, data.length);
-                        addServiceData(parsedData, uuid32, serviceData);
-                    }
-                    break;
-                case 0x21: // Service Data - 128-bit UUID
-                    if (data.length >= 16) {
-                        String uuid128 = bytesToHex(Arrays.copyOfRange(data, 0, 16));
-                        byte[] serviceData = Arrays.copyOfRange(data, 16, data.length);
-                        addServiceData(parsedData, uuid128, serviceData);
-                    }
+                    case 0x16: // Service Data - 16-bit UUID
+                        if (data.length >= 2) {
+                            String uuid16 = String.format("%04X", ((data[1] & 0xFF) << 8) | (data[0] & 0xFF));
+                            byte[] serviceData = Arrays.copyOfRange(data, 2, data.length);
+                            addServiceData(parsedData, uuid16, serviceData);
+                        }
+                        break;
+                    case 0x20: // Service Data - 32-bit UUID
+                        if (data.length >= 4) {
+                            String uuid32 = String.format("%08X",
+                                    ((data[3] & 0xFF) << 24) | ((data[2] & 0xFF) << 16) | ((data[1] & 0xFF) << 8) | (data[0] & 0xFF));
+                            byte[] serviceData = Arrays.copyOfRange(data, 4, data.length);
+                            addServiceData(parsedData, uuid32, serviceData);
+                        }
+                        break;
+                    case 0x21: // Service Data - 128-bit UUID
+                        if (data.length >= 16) {
+                            String uuid128 = bytesToHex(Arrays.copyOfRange(data, 0, 16));
+                            byte[] serviceData = Arrays.copyOfRange(data, 16, data.length);
+                            addServiceData(parsedData, uuid128, serviceData);
+                        }
 
-                default:
-                    parsedData.put("Unknown Data (" + type + ")", bytesToHex(data));
-                    break;
+                    default:
+                        parsedData.put("Unknown Data (" + type + ")", bytesToHex(data));
+                        break;
+                }
             }
+        } catch (Exception e) {
+            try {
+                parsedData.put ("error", "Parse failed: " + e.getMessage());
+            } catch ( JSONException ignored) {}
         }
 
         return parsedData;
     }
 
     private static void addServiceData(JSONObject parsedData, String uuid, byte[] serviceData) throws JSONException {
-        String key = "Service Data UUID " + uuid;
+        // UUID별 Service Data가 있는 배열인데 하나로만 uuid 아늠
+        String key = "Service Data" ;
         JSONArray serviceArray;
 
         if (parsedData.has(key)) {
@@ -381,5 +408,23 @@ public class BleScan {
 
         serviceArray.put(bytesToHex(serviceData));
     }
+
+    public static String uuid128LeToString(byte[] le) {
+        if (le == null || le.length != 16) {
+            throw new IllegalArgumentException("UUID byte array must be 16 bytes");
+        }
+        // LE → BE 변환 (역순)
+        byte[] be = new byte[16];
+        for (int i = 0; i < 16; i++) {
+            be[i] = le[15 - i];
+        }
+        // ByteBuffer로 읽어서 UUID 생성
+        java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(be);
+        long msb = bb.getLong();
+        long lsb = bb.getLong();
+        return new java.util.UUID(msb, lsb).toString();
+    }
+
+
 }
 
