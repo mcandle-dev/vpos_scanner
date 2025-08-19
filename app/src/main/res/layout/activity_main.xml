@@ -8,29 +8,26 @@
     android:orientation="vertical"
     tools:context="com.mcandle.bledemo.MainActivity">
 
-    <!-- 1번째 줄: Master, Scan, ComRev (여백) -->
+    <!-- 상단 Toolbar -->
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorPrimary"
+        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
+        app:title="MCandle"
+        app:titleTextColor="@android:color/white"
+        android:elevation="4dp" />
+
+    <!-- 버튼 레이아웃 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingTop="24dp">
-
-        <Button
-            android:id="@+id/btn1"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Master"
-            android:layout_marginEnd="8dp"/>
-
-        <Button
-            android:id="@+id/btn2"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Scan"
-            android:layout_marginEnd="8dp"
-            android:layout_marginStart="8dp"/>
+        android:paddingTop="24dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:gravity="center">
 
         <Button
             android:id="@+id/btn3"
@@ -38,24 +35,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Start"
-            android:layout_marginStart="8dp"/>
-    </LinearLayout>
-
-    <!-- 2번째 줄: Config (가로 3등분 가운데 1번째만 버튼, 나머지는 View로 공간만 차지) -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingTop="16dp">
-
-        <Button
-            android:id="@+id/btn_config"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Config"
             android:layout_marginEnd="8dp"/>
-
 
         <Button
             android:id="@+id/btn_advertise"
@@ -63,14 +43,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Advertise"
-            android:layout_marginEnd="8dp"
             android:layout_marginStart="8dp"/>
-
-        <!-- 공간 채우기용 View들 -->
-        <View
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_weight="1"/>
     </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView

@@ -4,6 +4,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.Menu
+import android.view.MenuItem
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -11,6 +13,7 @@ import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
@@ -32,10 +35,7 @@ import vpos.apipackage.Beacon
 
 class MainActivity : AppCompatActivity() {
     private lateinit var recyclerView: RecyclerView
-    private lateinit var btn1: Button
-    private lateinit var btn2: Button
     private lateinit var btn3: Button
-    private lateinit var btnConfig: Button  // 추가
     private lateinit var btnAdvertise: Button
 
     private var bleScan = BleScan() // BleScan 인스턴스 생성can()
@@ -55,6 +55,11 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
+        
+        // Toolbar 설정
+        val toolbar = findViewById<Toolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
+        
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
@@ -65,28 +70,10 @@ class MainActivity : AppCompatActivity() {
         recyclerView.adapter = adapter
         recyclerView.layoutManager = LinearLayoutManager(this)
 
-        btn1 = findViewById(R.id.btn1)
-        btn1.setOnClickListener {
-            Step1()
-            Log.d("MainActivity", "Button 1 clicked")
-        }
-
-        btn2 = findViewById(R.id.btn2)
-        btn2.setOnClickListener {
-            Step2()
-            Log.d("MainActivity", "Button 2 clicked")
-        }
-
         btn3 = findViewById(R.id.btn3)
         btn3.setOnClickListener {
             toggleScan()
             Log.d("MainActivity", "Button 3 clicked")
-        }
-
-        // 🔹 Config 버튼 연결
-        btnConfig = findViewById(R.id.btn_config)
-        btnConfig.setOnClickListener {
-            showScanFilterConfigDialog()
         }
 
         // 🔹 Advertise 버튼 연결
@@ -105,18 +92,21 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    private fun Step1() {
-        val ret = bleScan.enableMasterMode(true)
-        Log.d("MainActivity", "Step1: " + ret)
-        val mac = bleScan.getDeviceMacAddress()
-        Log.d("MainActivity", "mac: " + mac)
-
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.main_menu, menu)
+        return true
     }
 
-    private fun Step2() {
-        val ret = bleScan.startNewScan("", "", 0, "", "")
-        Log.d("MainActivity", "Step2: " + ret)
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_settings -> {
+                showScanFilterConfigDialog()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
     }
+
 
     // 안전한 복사본 만들기 (예외 없이)
     private fun copyJsonArraySafe(source: JSONArray): JSONArray {
@@ -226,8 +216,6 @@ class MainActivity : AppCompatActivity() {
             // Stop Scan
             isScanning = false
             btn3.text = "Start"
-            btn1.isEnabled = true
-            btn2.isEnabled = true
             scanJob?.cancel() // 코루틴 중지
             bleScan.stopScan() // BLE 스캔 중지
             Log.d("MainActivity", "Scanning stopped")
@@ -235,8 +223,6 @@ class MainActivity : AppCompatActivity() {
             // Start Scan
             isScanning = true
             btn3.text = "Stop"
-            btn1.isEnabled = false
-            btn2.isEnabled = false
 
             // ✅ 스캔 시작 전에 기존 리스트 초기화
             deviceList.clear()
@@ -438,21 +424,51 @@ class MainActivity : AppCompatActivity() {
     }
 
     public fun sendAdvertise() {
-
-        // 확인사항 -2500 오류 방지를 위해서 advertise 전에 scan을 멈추고 시작
-        toggleScan()
-
-        var ret = 0
-        ret = At.Lib_EnableBeacon(true)
-        Log.d("MainActivity", "sendAdvertise-ret: " + ret)
-
-        if (ret == 0) {
-            SendPromptMsg("Start beacon succeeded!\n")
-            SendPromptMsg("Note: Effective immediately; Power-off preservation.\n")
+        // -2500 타임아웃 에러 방지를 위해 스캔 상태 확인 후 일시 중지
+        val wasScanningBeforeAdvertise = isScanning
+        if (isScanning) {
+            isScanning = false
+            scanJob?.cancel()
+            bleScan.stopScan()
+            btn3.text = "Start"
+            Log.d("MainActivity", "Scan paused for advertising")
         }
-        else {
-            SendPromptMsg("Start beacon failed, return: ${ret}\n")
-        }
+
+        Thread {
+            val ret = At.Lib_EnableBeacon(true)
+            Log.d("MainActivity", "sendAdvertise-ret: " + ret)
+            
+            runOnUiThread {
+                when (ret) {
+                    0 -> {
+                        SendPromptMsg("Start beacon succeeded!\n")
+                        SendPromptMsg("Note: Effective immediately; Power-off preservation.\n")
+                    }
+                    -2500 -> SendPromptMsg("Beacon start failed: Communication timeout\n")
+                    -2501 -> SendPromptMsg("Beacon start failed: Wrong length\n")
+                    -2502 -> SendPromptMsg("Beacon start failed: Communication error\n")
+                    -2503 -> SendPromptMsg("Beacon start failed: Wrong data\n")
+                    -2504 -> SendPromptMsg("Beacon start failed: Wrong command\n")
+                    -2505 -> SendPromptMsg("Beacon start failed: EDC error\n")
+                    -2506 -> SendPromptMsg("Beacon start failed: Other error\n")
+                    -2507 -> SendPromptMsg("Beacon start failed: CRC16 error\n")
+                    -2508 -> SendPromptMsg("Beacon start failed: Open failed\n")
+                    -2509 -> SendPromptMsg("Beacon start failed: Send error\n")
+                    -2510 -> SendPromptMsg("Beacon start failed: Receive error\n")
+                    else -> SendPromptMsg("Beacon start failed, return: ${ret}\n")
+                }
+                
+                // 이전에 스캔 중이었다면 자동으로 다시 시작
+                if (wasScanningBeforeAdvertise && ret == 0) {
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        if (!isScanning) {
+                            toggleScan()
+                            Log.d("MainActivity", "Scan resumed after advertising")
+                        }
+                    }, 1000) // 1초 후 스캔 재개
+                }
+            }
+        }.start()
     }
 
     public fun stopAdvertise() {
@@ -481,50 +497,73 @@ class MainActivity : AppCompatActivity() {
         runOnUiThread {
             var newDeviceCount = 0
             var updatedDeviceCount = 0
+            val positionsToUpdate = mutableListOf<Int>()
 
             // 이번 배치에 안 들어온 기기는 지우지 말고 약화 표시
-            for (device in deviceList) {
+            for ((index, device) in deviceList.withIndex()) {
                 if (newDevices.none { it.address == device.address }) {
-                    device.rssi = -100
+                    if (device.rssi != -100) {
+                        device.rssi = -100
+                        positionsToUpdate.add(index)
+                    }
                 }
             }
 
             for (newDevice in newDevices) {
-                val existingDevice = deviceList.find { it.address == newDevice.address }
-                if (existingDevice != null) {
+                val existingIndex = deviceList.indexOfFirst { it.address == newDevice.address }
+                if (existingIndex != -1) {
+                    val existingDevice = deviceList[existingIndex]
+                    var isChanged = false
+
                     // RSSI는 항상 최신
-                    existingDevice.rssi = newDevice.rssi
+                    if (existingDevice.rssi != newDevice.rssi) {
+                        existingDevice.rssi = newDevice.rssi
+                        isChanged = true
+                    }
 
                     // ✅ 새 값이 있을 때만 덮어쓰기 (빈 문자열이면 이전 값 유지)
-                    if (newDevice.manufacturerData.isNotEmpty()) {
+                    if (newDevice.manufacturerData.isNotEmpty() && existingDevice.manufacturerData != newDevice.manufacturerData) {
                         existingDevice.manufacturerData = newDevice.manufacturerData
+                        isChanged = true
                     }
-                    if (newDevice.serviceUuids.isNotEmpty()) {
+                    if (newDevice.serviceUuids.isNotEmpty() && existingDevice.serviceUuids != newDevice.serviceUuids) {
                         existingDevice.serviceUuids = newDevice.serviceUuids
+                        isChanged = true
                     }
-                    if (newDevice.serviceData.isNotEmpty()) {
+                    if (newDevice.serviceData.isNotEmpty() && existingDevice.serviceData != newDevice.serviceData) {
                         existingDevice.serviceData = newDevice.serviceData
+                        isChanged = true
                     }
 
                     // 이름은 Unknown일 때만 새 값으로
                     if (existingDevice.name == "Unknown" && newDevice.name.isNotBlank()) {
                         existingDevice.name = newDevice.name
+                        isChanged = true
                     }
 
                     // TxPower는 값이 있을 때만 갱신
-                    if (newDevice.txPower != null) {
+                    if (newDevice.txPower != null && existingDevice.txPower != newDevice.txPower) {
                         existingDevice.txPower = newDevice.txPower
+                        isChanged = true
                     }
 
+                    if (isChanged) {
+                        positionsToUpdate.add(existingIndex)
+                    }
                     updatedDeviceCount++
                 } else {
                     deviceList.add(newDevice)
+                    adapter.notifyItemInserted(deviceList.size - 1)
                     newDeviceCount++
                 }
             }
 
-            adapter.notifyDataSetChanged()
-            // Log.d("BLE_SCAN", "Updated Device List: New = $newDeviceCount, Updated = $updatedDeviceCount")
+            // 변경된 항목만 개별적으로 업데이트
+            for (position in positionsToUpdate) {
+                adapter.notifyItemChanged(position)
+            }
+
+            // Log.d("BLE_SCAN", "Updated Device List: New = $newDeviceCount, Updated = $updatedDeviceCount, Changed positions = ${positionsToUpdate.size}")
         }
     }
 
