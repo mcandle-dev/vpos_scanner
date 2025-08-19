@@ -162,9 +162,15 @@ class MainActivity : AppCompatActivity() {
                 val rssi = jsonObj.optInt("RSSI", -100)
 
                 var name = "Unknown"
+                // RSP 패킷에서 Device Name 확인
                 if (jsonObj.has("RSP")) {
                     val rspObj = jsonObj.getJSONObject("RSP")
                     name = rspObj.optString("Device Name", "Unknown")
+                }
+                // ADV 패킷에서도 Device Name 확인 (RSP에서 못 찾았을 때)
+                if (name == "Unknown" && jsonObj.has("ADV")) {
+                    val advObj = jsonObj.getJSONObject("ADV")
+                    name = advObj.optString("Device Name", "Unknown")
                 }
 
                 // Service UUIDs 키 변형 대응: "Service UUIDs" / "ServiceUUIDs"

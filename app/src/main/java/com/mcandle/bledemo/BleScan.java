@@ -94,7 +94,7 @@ public class BleScan {
         ret = At.Lib_AtStartNewScan(
                 sp.getString("macAddress", ""),
                 sp.getString("broadcastfName", "MCan"),
-                -Integer.parseInt(sp.getString("rssi", "0")),
+                -sp.getInt("rssi", 0),
                 sp.getString("manufacturerId", ""),
                 sp.getString("data", "")
         );
