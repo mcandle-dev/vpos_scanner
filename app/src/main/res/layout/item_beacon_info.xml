@@ -5,9 +5,48 @@
     android:padding="16dp">
 
     <TextView
+        android:id="@+id/tvConfigScannerTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Config Scanner"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tvDeviceName"
+        android:layout_width="122dp"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/tvConfigScannerTitle"
+        android:layout_marginTop="16dp"
+        android:text="Device Name:"
+        android:textSize="16sp" />
+
+    <EditText
+        android:id="@+id/etBroadcastName"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@+id/tvDeviceName"
+        android:layout_alignParentEnd="true"
+        android:layout_toEndOf="@+id/tvDeviceName"
+        android:inputType="text"
+        android:hint="MCan" />
+
+    <TextView
+        android:id="@+id/tvConfigBeaconTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/tvDeviceName"
+        android:layout_marginTop="24dp"
+        android:text="Config Beacon"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <TextView
         android:id="@+id/tvCompanyId"
         android:layout_width="122dp"
         android:layout_height="wrap_content"
+        android:layout_below="@+id/tvConfigBeaconTitle"
+        android:layout_marginTop="16dp"
         android:text="Company ID: 0x"
         android:textSize="16sp" />
 
@@ -83,5 +122,40 @@
         android:digits="0123456789abcdefABCDEF,"
         android:inputType="textMultiLine"
         android:maxLength="32" />
+
+    <TextView
+        android:id="@+id/tvDisplayTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/tvCustomUuid"
+        android:layout_marginTop="24dp"
+        android:text="Display Title"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <RadioGroup
+        android:id="@+id/rgDisplayTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/tvDisplayTitle"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal">
+
+        <RadioButton
+            android:id="@+id/rbMembership"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="24dp"
+            android:text="멤버십"
+            android:textSize="16sp" />
+
+        <RadioButton
+            android:id="@+id/rbBLE"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="BLE"
+            android:textSize="16sp" />
+
+    </RadioGroup>
 
 </RelativeLayout>

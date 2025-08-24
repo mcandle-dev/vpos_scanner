@@ -11,8 +11,43 @@ import androidx.recyclerview.widget.RecyclerView
 
 class BLEDeviceAdapter(
     private val deviceList: MutableList<DeviceModel>,
-    private val onDeviceClick: (DeviceModel) -> Unit  // ✅ DeviceModel을 그대로 전달하도록 수정
-) : RecyclerView.Adapter<BLEDeviceAdapter.BLEDeviceViewHolder>() {
+    private val onDeviceClick: (DeviceModel) -> Unit,
+    private var displayMode: String = "BLE"  // "BLE" 또는 "멤버십"
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+
+    companion object {
+        private const val VIEW_TYPE_BLE = 1
+        private const val VIEW_TYPE_MEMBERSHIP = 2
+    }
+
+    // 멤버십 정보 업데이트 함수
+    fun updateDisplayMode(mode: String) {
+        displayMode = mode
+        notifyDataSetChanged()
+    }
+
+    // ServiceUUID에서 멤버십 정보 파싱: "2200님 (1234 5678 5567 6666)"
+    private fun parseServiceUuidForMembership(serviceUuid: String): String {
+        if (serviceUuid.isEmpty()) return "정보 없음"
+        
+        // UUID의 의미 있는 부분만 추출 (처음 4개 그룹)
+        // 예: "12345678-9012-3456-2200-00805f9b34fb" -> "12345678-9012-3456-2200"
+        val meaningfulPart = serviceUuid.split("-").take(4).joinToString("-")
+        val digitsOnly = meaningfulPart.filter { it.isDigit() }
+        
+        if (digitsOnly.length < 18) return "데이터 부족"
+        
+        // 전화번호: 네 번째 그룹 전체 (2200)
+        val lastGroup = serviceUuid.split("-").getOrNull(3) ?: ""
+        val phoneNumber = if (lastGroup.isNotEmpty()) lastGroup else "0000"
+        
+        // 카드번호: 처음 16자리
+        val cardNumber = digitsOnly.take(16)
+            .chunked(4)
+            .joinToString(" ")
+        
+        return "${phoneNumber}님 ($cardNumber)"
+    }
 
     class BLEDeviceViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val deviceAddressTextView: TextView = itemView.findViewById(R.id.deviceAddress)
@@ -26,14 +61,48 @@ class BLEDeviceAdapter(
         val serviceDataTextView: TextView = itemView.findViewById(R.id.tvServiceData)
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): BLEDeviceViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_ble_device, parent, false)
-        return BLEDeviceViewHolder(view)
+    class MembershipViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        val membershipInfoTextView: TextView = itemView.findViewById(R.id.tvMembershipInfo)
+        val macAddressTextView: TextView = itemView.findViewById(R.id.tvMacAddress)
+        val rssiValueTextView: TextView = itemView.findViewById(R.id.tvRssiValue)
+        val rssiIcon: ImageView = itemView.findViewById(R.id.ivRssiIcon)
     }
 
-    override fun onBindViewHolder(holder: BLEDeviceViewHolder, position: Int) {
+    override fun getItemViewType(position: Int): Int {
+        return when (displayMode) {
+            "멤버십" -> VIEW_TYPE_MEMBERSHIP
+            else -> VIEW_TYPE_BLE
+        }
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        return when (viewType) {
+            VIEW_TYPE_MEMBERSHIP -> {
+                val view = LayoutInflater.from(parent.context).inflate(R.layout.item_membership_device, parent, false)
+                MembershipViewHolder(view)
+            }
+            else -> {
+                val view = LayoutInflater.from(parent.context).inflate(R.layout.item_ble_device, parent, false)
+                BLEDeviceViewHolder(view)
+            }
+        }
+    }
+
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         val device = deviceList[position]
 
+        when (holder) {
+            is BLEDeviceViewHolder -> bindBLEDevice(holder, device)
+            is MembershipViewHolder -> bindMembershipDevice(holder, device)
+        }
+
+        // 클릭 이벤트는 공통
+        holder.itemView.setOnClickListener {
+            onDeviceClick(device)
+        }
+    }
+
+    private fun bindBLEDevice(holder: BLEDeviceViewHolder, device: DeviceModel) {
         holder.deviceAddressTextView.text = device.address
         holder.deviceRssiTextView.text = "${device.rssi} dBm"
         holder.deviceNameTextView.text = device.name
@@ -50,7 +119,6 @@ class BLEDeviceAdapter(
         holder.serviceDataTextView.text = "Service Data: ${device.getServiceDataHex().ifEmpty { "N/A" }}"
         holder.serviceDataTextView.visibility = if (device.serviceData.isNotEmpty()) View.VISIBLE else View.GONE
 
-
         val context = holder.itemView.context
         val grayColor = ContextCompat.getColor(context, R.color.gray)
         val defaultColor = ContextCompat.getColor(context, R.color.default_text_color)
@@ -62,10 +130,30 @@ class BLEDeviceAdapter(
             holder.deviceRssiTextView.setTextColor(defaultColor)
             holder.deviceRssiIcon.setColorFilter(defaultColor, PorterDuff.Mode.SRC_IN)
         }
+    }
 
-        // 🔹 클릭 이벤트를 MainActivity에서 처리하도록 변경
-        holder.itemView.setOnClickListener {
-            onDeviceClick(device)
+    private fun bindMembershipDevice(holder: MembershipViewHolder, device: DeviceModel) {
+        // 멤버십 정보 파싱 및 표시
+        val membershipInfo = parseServiceUuidForMembership(device.serviceUuids)
+        holder.membershipInfoTextView.text = membershipInfo
+
+        // MAC 주소
+        holder.macAddressTextView.text = device.address
+
+        // RSSI 정보
+        holder.rssiValueTextView.text = "${device.rssi} dBm"
+
+        // RSSI 아이콘 색상
+        val context = holder.itemView.context
+        val grayColor = ContextCompat.getColor(context, R.color.gray)
+        val defaultColor = ContextCompat.getColor(context, R.color.default_text_color)
+
+        if (device.rssi == -100) {
+            holder.rssiValueTextView.setTextColor(grayColor)
+            holder.rssiIcon.setColorFilter(grayColor, PorterDuff.Mode.SRC_IN)
+        } else {
+            holder.rssiValueTextView.setTextColor(defaultColor)
+            holder.rssiIcon.setColorFilter(defaultColor, PorterDuff.Mode.SRC_IN)
         }
     }
 

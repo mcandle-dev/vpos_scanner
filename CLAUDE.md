@@ -75,9 +75,12 @@ This is an Android application for experimenting with Bluetooth Low Energy (BLE)
 - Provides helper methods for hex data conversion
 - Includes timestamp tracking for device discovery
 
-**BLEDeviceAdapter.kt** - RecyclerView adapter for device list display
-- Renders discovered devices with signal strength indicators
-- Shows manufacturer data, service UUIDs, and service data
+**BLEDeviceAdapter.kt** - RecyclerView adapter for device list display with dual view modes
+- Supports ViewType switching between BLE and Membership display modes
+- BLE mode: Complete technical details (manufacturer data, service UUIDs, service data)
+- Membership mode: Parsed display showing phone number and card number from Service UUID
+- Uses `item_ble_device.xml` for BLE mode and `item_membership_device.xml` for Membership mode
+- Real-time mode switching via `updateDisplayMode()` method
 - Handles device selection for payment processing
 
 **BLEAdvertiseDialogFragment.kt** - Modal for BLE advertising control
@@ -99,6 +102,10 @@ This is an Android application for experimenting with Bluetooth Low Energy (BLE)
 
 **Beacon Configuration System**: Supports dynamic beacon parameter configuration using SharedPreferences storage, allowing customization of Company ID, Major/Minor UUIDs, and custom data.
 
+**Dual Display Architecture**: Implements ViewType-based RecyclerView adapter that switches between technical BLE view and simplified membership view based on user preference stored in SharedPreferences.
+
+**Real-time UI Updates**: Display mode changes are immediately reflected in the RecyclerView without requiring app restart, using `updateDisplayMode()` and `notifyDataSetChanged()`.
+
 ## Important Development Notes
 
 ### BLE Workflow
@@ -117,6 +124,14 @@ This is an Android application for experimenting with Bluetooth Low Energy (BLE)
 - Raw BLE data → JSON parsing → DeviceModel objects → RecyclerView display
 - Advertisement data includes manufacturer data, service UUIDs, and service data
 - Payment processing extracts card/phone numbers from service UUID data
+- Display mode determines rendering: BLE mode shows all technical data, Membership mode parses and simplifies Service UUID into readable format
+
+### Display Mode Parsing
+- **BLE Mode**: Shows raw Service UUID and all technical data
+- **Membership Mode**: Parses Service UUID (e.g., "12345678-9012-3456-2200-00805f9b34fb")
+  - Extracts first 16 digits for card number: "1234 5678 9012 3456" 
+  - Extracts 4th UUID group for phone number: "2200"
+  - Displays as: "2200님 (1234 5678 9012 3456)"
 
 ### Testing Strategy
 - Unit tests are located in `app/src/test/java/`
@@ -128,3 +143,6 @@ This is an Android application for experimenting with Bluetooth Low Energy (BLE)
 - Beacon configuration changes require understanding of the vendor library's parameter format
 - UI updates from BLE callbacks must use `runOnUiThread` or coroutine main dispatchers
 - RSSI values and device caching logic should maintain existing device state preservation patterns
+- Display mode changes require updating the adapter on the main thread to avoid ViewRootImpl exceptions
+- When adding new SharedPreferences settings, ensure they are loaded during app initialization
+- Service UUID parsing logic should handle malformed UUIDs gracefully and provide fallback displays

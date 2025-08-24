@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="?android:attr/selectableItemBackground">
+
+    <!-- 멤버십 정보: "2200님 (1234 5678 5567 6666)" -->
+    <TextView
+        android:id="@+id/tvMembershipInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#000000"
+        android:text="2200님 (1234 5678 5567 6666)" />
+
+    <!-- RSSI 정보 (우측 정렬) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="4dp">
+
+        <!-- MAC Address (좌측) -->
+        <TextView
+            android:id="@+id/tvMacAddress"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="12sp"
+            android:textColor="#666666"
+            android:text="00:11:22:33:44:55" />
+
+        <!-- RSSI with Icon (우측) -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <ImageView
+                android:id="@+id/ivRssiIcon"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:src="@drawable/round_signal_cellular_alt_24"
+                android:contentDescription="Signal Strength" />
+
+            <TextView
+                android:id="@+id/tvRssiValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="14sp"
+                android:textColor="#666666"
+                android:text="-50 dBm"
+                android:layout_marginStart="4dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Divider Line -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#DDDDDD"
+        android:layout_marginTop="12dp" />
+
+</LinearLayout>

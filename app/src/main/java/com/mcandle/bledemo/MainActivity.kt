@@ -7,12 +7,16 @@ import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.Button
+import android.widget.CompoundButton
 import android.widget.EditText
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SwitchCompat
 import androidx.appcompat.widget.Toolbar
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -37,12 +41,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var recyclerView: RecyclerView
     private lateinit var btn3: Button
     private lateinit var btnAdvertise: Button
+    private lateinit var switchBeaconMaster: SwitchCompat
 
     private var bleScan = BleScan() // BleScan 인스턴스 생성can()
     private var isScanning = false // 상태 변수 추가
     private var scanJob: Job? = null // 코루틴 Job 저장 변수
     private var mStartFlag = false
-    private var mEnableFlag = true
+    private var isBeaconActive = false // Beacon 활성화 상태 (true: 활성화, false: 비활성화)
+    private var mMasterFlag = false // BEACON/MASTER 모드 플래그
 
 
     private val deviceList = mutableListOf<DeviceModel>()
@@ -66,9 +72,21 @@ class MainActivity : AppCompatActivity() {
             insets
         }
         recyclerView = findViewById(R.id.recyclerView)
-        adapter = BLEDeviceAdapter(deviceList) { device -> onDeviceSelected(device) }
+        
+        // SharedPreferences에서 현재 Display Title 모드 가져오기
+        val sp = getSharedPreferences("beaconInfo", MODE_PRIVATE)
+        val currentDisplayMode = sp.getString("displayTitle", "멤버십") ?: "멤버십"
+        
+        adapter = BLEDeviceAdapter(deviceList, { device -> onDeviceSelected(device) }, currentDisplayMode)
         recyclerView.adapter = adapter
         recyclerView.layoutManager = LinearLayoutManager(this)
+
+        // BEACON/MASTER 스위치 설정
+        switchBeaconMaster = findViewById(R.id.BeaconMaster)
+        switchBeaconMaster.setOnCheckedChangeListener { _, isChecked ->
+            mMasterFlag = isChecked
+            Log.d("MainActivity", "Mode switched to: ${if (isChecked) "MASTER" else "BEACON"}")
+        }
 
         btn3 = findViewById(R.id.btn3)
         btn3.setOnClickListener {
@@ -220,7 +238,14 @@ class MainActivity : AppCompatActivity() {
             bleScan.stopScan() // BLE 스캔 중지
             Log.d("MainActivity", "Scanning stopped")
         } else {
-            // Start Scan
+            // Start Scan - Beacon 모드이면 자동으로 Master 모드로 변경
+            if (!mMasterFlag) {
+                mMasterFlag = true
+                switchBeaconMaster.isChecked = true // UI 업데이트
+                SendPromptMsg("Switched to MASTER mode for scanning")
+                Log.d("MainActivity", "Automatically switched to MASTER mode")
+            }
+            
             isScanning = true
             btn3.text = "Stop"
 
@@ -230,6 +255,8 @@ class MainActivity : AppCompatActivity() {
 
             // 코루틴 실행 (백그라운드에서 실행)
             scanJob = CoroutineScope(Dispatchers.IO).launch {
+                // Master 모드 확인 및 설정
+                At.Lib_EnableMaster(true)
                 startBleScan()
             }
             Log.d("MainActivity", "Scanning started")
@@ -332,26 +359,48 @@ class MainActivity : AppCompatActivity() {
         SendPromptMsg("")
 
         val inputLayout = layoutInflater.inflate(R.layout.item_beacon_info, null)
+        val etBroadcastName = inputLayout.findViewById<EditText>(R.id.etBroadcastName)
         val etCompanyId = inputLayout.findViewById<EditText>(R.id.etCompanyId)
         val etMajorUuid = inputLayout.findViewById<EditText>(R.id.etMajorUuid)
         val etMinorUuid = inputLayout.findViewById<EditText>(R.id.etMinorUuid)
         val etCustomUuid = inputLayout.findViewById<EditText>(R.id.etCustomUuid)
+        val rgDisplayTitle = inputLayout.findViewById<RadioGroup>(R.id.rgDisplayTitle)
+        val rbMembership = inputLayout.findViewById<RadioButton>(R.id.rbMembership)
+        val rbBLE = inputLayout.findViewById<RadioButton>(R.id.rbBLE)
 
+        val scanSp = getSharedPreferences("scanInfo", MODE_PRIVATE)
+        etBroadcastName.setText(scanSp.getString("broadcastName", "MCan"))
+        
         val sp = getSharedPreferences("beaconInfo", MODE_PRIVATE)
+        
+        // Display Title 라디오 버튼 초기값 설정
+        val savedDisplayTitle = sp.getString("displayTitle", "멤버십")
+        when (savedDisplayTitle) {
+            "멤버십" -> rbMembership.isChecked = true
+            "BLE" -> rbBLE.isChecked = true
+            else -> rbMembership.isChecked = true // 기본값: 멤버십
+        }
         etCompanyId.setText(sp.getString("companyId", "4C00"))
 
-//        etMajorUuid.setText(sp.getString("majorUuid", "2200"))
-//        etMinorUuid.setText(sp.getString("minorUuid", "0506"))
+        val hexMajor = sp.getString("majorUuid", "0898") ?: "0898"
+        val decimalMajor = String.format("%04d", hexMajor.toInt(16))
+        etMajorUuid.setText(decimalMajor)
+
+        val hexMinor = sp.getString("minorUuid", "0506") ?: "0506"
+        val decimalMinor = String.format("%04d", hexMinor.toInt(16))
+        etMinorUuid.setText(decimalMinor)
+
         //etCustomUuid.setText(sp.getString("customUuid", "1234567890123456"))
-        // 나중 원복
-        etMajorUuid.setText("2200")
-        etMinorUuid.setText("0506")
+        // 나중 원복   0898 -> 2200 으로 변경
+
+
         etCustomUuid.setText("1234567890123456")
         AlertDialog.Builder(this)
-            .setTitle("Config Beacon")
+            .setTitle("Setting")
             .setView(inputLayout)
             .setCancelable(false)
             .setPositiveButton("OK") { dialog, _ ->
+                val broadcastName = etBroadcastName.text.toString().trim()
                 val companyId = etCompanyId.text.toString().trim()
                 val majorUuidStr = etMajorUuid.text.toString().trim()
                 val minorUuidStr = etMinorUuid.text.toString().trim()
@@ -361,6 +410,13 @@ class MainActivity : AppCompatActivity() {
 
                 // 2. 기존 BLEUtils.asciiToHex() 사용 (공백 제거 포함)
                 val customUuid = BLEUtils.asciiToHex(paddedCustomUuid).replace(" ", "")
+                
+                // Display Title 선택값 가져오기
+                val selectedDisplayTitle = when (rgDisplayTitle.checkedRadioButtonId) {
+                    R.id.rbMembership -> "멤버십"
+                    R.id.rbBLE -> "BLE"
+                    else -> "멤버십" // 기본값
+                }
 
 
                 // 1. majorUuid: 10진수 → 16진수 4자리 문자열
@@ -404,12 +460,23 @@ class MainActivity : AppCompatActivity() {
                                     "Minor: 0x${beacon.minor}\n" +
                                     "Custom UUID: 0x${beacon.customUuid}\n"
                         )
+                        val scanEditor = scanSp.edit()
+                        scanEditor.putString("broadcastName", broadcastName)
+                        scanEditor.apply()
+                        
                         val editor = sp.edit()
                         editor.putString("companyId", companyId)
                         editor.putString("majorUuid", majorUuid)
                         editor.putString("minorUuid", minorUuid)
                         editor.putString("customUuid", customUuid)
+                        editor.putString("displayTitle", selectedDisplayTitle) // Display Title 저장
                         editor.apply()
+                        
+                        // UI 업데이트는 메인 스레드에서 실행
+                        runOnUiThread {
+                            adapter.updateDisplayMode(selectedDisplayTitle)
+                            Log.d("MainActivity", "Display Title saved: $selectedDisplayTitle")
+                        }
                     } else {
                         SendPromptMsg("Config beacon failed, return: $ret\n")
                     }
@@ -435,6 +502,17 @@ class MainActivity : AppCompatActivity() {
         }
 
         Thread {
+            // BEACON 모드로 변경 (Master 모드에서 Beacon 모드로 전환)
+            if (mMasterFlag) {
+                At.Lib_EnableMaster(false) // Master 모드 해제
+                mMasterFlag = false
+                runOnUiThread {
+                    switchBeaconMaster.isChecked = false // UI 업데이트
+                    SendPromptMsg("Switched to BEACON mode for advertising")
+                }
+                Log.d("MainActivity", "Automatically switched from MASTER to BEACON mode")
+            }
+            
             val ret = At.Lib_EnableBeacon(true)
             Log.d("MainActivity", "sendAdvertise-ret: " + ret)
             
@@ -443,6 +521,7 @@ class MainActivity : AppCompatActivity() {
                     0 -> {
                         SendPromptMsg("Start beacon succeeded!\n")
                         SendPromptMsg("Note: Effective immediately; Power-off preservation.\n")
+                        isBeaconActive = true // Beacon이 활성화된 상태
                     }
                     -2500 -> SendPromptMsg("Beacon start failed: Communication timeout\n")
                     -2501 -> SendPromptMsg("Beacon start failed: Wrong length\n")
@@ -458,10 +537,13 @@ class MainActivity : AppCompatActivity() {
                     else -> SendPromptMsg("Beacon start failed, return: ${ret}\n")
                 }
                 
-                // 이전에 스캔 중이었다면 자동으로 다시 시작
+                // 이전에 스캔 중이었다면 자동으로 다시 시작 (Master 모드로 전환 후)
                 if (wasScanningBeforeAdvertise && ret == 0) {
                     Handler(Looper.getMainLooper()).postDelayed({
                         if (!isScanning) {
+                            // Master 모드로 다시 전환하고 스캔 재개
+                            mMasterFlag = true
+                            switchBeaconMaster.isChecked = true
                             toggleScan()
                             Log.d("MainActivity", "Scan resumed after advertising")
                         }
@@ -472,16 +554,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     public fun stopAdvertise() {
-        var ret = 0
-        ret = At.Lib_EnableBeacon(false)
-
-        if (ret == 0) {
-            SendPromptMsg("Stop beacon succeeded!\n")
-            SendPromptMsg("Note: Effective immediately; Power-off preservation.\n")
-        } else {
-            SendPromptMsg("Stop beacon failed, return: $ret\n")
-        }
-
+        Thread {
+            val ret = At.Lib_EnableBeacon(false)
+            
+            runOnUiThread {
+                if (ret == 0) {
+                    SendPromptMsg("Stop beacon succeeded!\n")
+                    SendPromptMsg("Note: Effective immediately; Power-off preservation.\n")
+                    isBeaconActive = false // Beacon이 비활성화된 상태
+                } else {
+                    SendPromptMsg("Stop beacon failed, return: $ret\n")
+                }
+            }
+        }.start()
     }
 
     fun SendPromptMsg(strInfo: String?) {
@@ -600,7 +685,70 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    override fun finish() {
+        Log.d("MainActivity", "=== finish() called ===")
+        Log.d("MainActivity", "isBeaconActive: $isBeaconActive")
+        Log.d("MainActivity", "mMasterFlag: $mMasterFlag")
+        Log.d("MainActivity", "isScanning: $isScanning")
+        
+        if (isBeaconActive || isScanning) {
+            Log.d("MainActivity", "Beacon active or scanning - showing dialog")
+            val message = when {
+                isBeaconActive && isScanning -> "Beacon is active and scanning is running. Do you want to stop both before closing?"
+                isBeaconActive -> "Beacon is currently active. Do you want to disable it before closing?"
+                isScanning -> "Scanning is currently running. Do you want to stop it before closing?"
+                else -> "Do you want to exit?"
+            }
+            
+            AlertDialog.Builder(this)
+                .setTitle("Exit Application")
+                .setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton("Yes") { _, _ ->
+                    Log.d("MainActivity", "User chose YES - stopping services")
+                    Thread {
+                        if (isBeaconActive) {
+                            At.Lib_EnableBeacon(false)
+                            Log.d("MainActivity", "Beacon disabled")
+                        }
+                        if (isScanning) {
+                            isScanning = false
+                            scanJob?.cancel()
+                            bleScan.stopScan()
+                            Log.d("MainActivity", "Scanning stopped")
+                        }
+                        runOnUiThread {
+                            super.finish()
+                        }
+                    }.start()
+                }
+                .setNegativeButton("No") { _, _ ->
+                    Log.d("MainActivity", "User chose NO - finishing without stopping services")
+                    super.finish()
+                }
+                .show()
+            return
+        }
+        
+        // 스캔 중인 경우 중지
+        if (isScanning) {
+            Log.d("MainActivity", "Stopping scan before finish")
+            isScanning = false
+            scanJob?.cancel()
+            bleScan.stopScan()
+        }
+        
+        Log.d("MainActivity", "Calling super.finish()")
+        super.finish()
+    }
 
-
+    override fun onBackPressed() {
+        Log.d("MainActivity", "=== onBackPressed() called ===")
+        Log.d("MainActivity", "isBeaconActive: $isBeaconActive")
+        Log.d("MainActivity", "mMasterFlag: $mMasterFlag") 
+        Log.d("MainActivity", "isScanning: $isScanning")
+        Log.d("MainActivity", "About to call finish()")
+        finish()
+    }
 
 }
