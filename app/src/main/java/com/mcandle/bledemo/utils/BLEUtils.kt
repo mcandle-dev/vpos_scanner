@@ -38,12 +38,4 @@ object BLEUtils {
         }
         return output.toString()
     }
-
-    // Hex 문자열을 바이트 배열로 변환하는 함수
-    private fun hexStringToByteArray(hexString: String): ByteArray {
-        return hexString.split(" ")
-            .filter { it.isNotEmpty() }
-            .map { it.toInt(16).toByte() }
-            .toByteArray()
-    }
 }

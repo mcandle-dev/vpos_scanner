@@ -17,7 +17,6 @@ import vpos.apipackage.At;
 public class BleScan {
     private boolean isScanning = false;
     private static final String TAG = "BLEScan";
-    private boolean isMaster;
 
     // ✅ 인터페이스를 BLEScan 클래스 내부에 정의
     public interface ScanResultListener {
@@ -36,38 +35,11 @@ public class BleScan {
         this.dataReceiveListener = listener;
     }
 
-    public int enableMasterMode(boolean enable) {
-        if (isMaster == enable) {
-            Log.d("BLE_MANAGER", "Already in the requested mode. No changes made.");
-            return 0; // ✅ 동일한 상태면 변경 없음
-        } else {
-            int ret = At.Lib_EnableMaster(enable);
-            if (!enable) {
-                isMaster = true; // false에서 true로 변경하여 이후 호출 방지
-            } else {
-                isMaster = enable;
-            }
-            Log.d("BLE_MANAGER", "Master mode updated successfully, Result: " + ret);
-            return ret; // ✅ 변경 적용
-        }
-    }
-
     public String getDeviceMacAddress() {
         String[] macAddress = new String[1];
         int ret = At.Lib_GetAtMac(macAddress);
         Log.d("BLE_SCAN", "Device MAC Address: " + macAddress[0]);
         return (ret == 0) ? macAddress[0] : null;
-    }
-
-    public int startNewScan(String macAddress,
-                            String broadcastName,
-                            int rssi,
-                            String manufacturerId,
-                            String data) {
-        int ret = At.Lib_AtStartNewScan(macAddress, broadcastName, -rssi, manufacturerId, data);
-
-        Log.e("BLE_SCAN", "BLE Scan Started with result: " + ret);
-        return ret;
     }
 
     public void startScanAsync(SharedPreferences sp, ScanResultListener listener) {

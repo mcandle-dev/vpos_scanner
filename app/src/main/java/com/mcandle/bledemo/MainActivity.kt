@@ -1,8 +1,6 @@
 package com.mcandle.bledemo
 
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
@@ -21,7 +19,6 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.mcandle.bledemo.utils.BLEUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -361,85 +358,6 @@ class MainActivity : AppCompatActivity() {
                 mStartFlag = false
             }
             .show()
-    }
-
-    public fun sendAdvertise() {
-        // -2500 타임아웃 에러 방지를 위해 스캔 상태 확인 후 일시 중지
-        val wasScanningBeforeAdvertise = isScanning
-        if (isScanning) {
-            isScanning = false
-            scanJob?.cancel()
-            bleScan.stopScan()
-            btn3.text = "Start"
-            Log.d("MainActivity", "Scan paused for advertising")
-        }
-
-        Thread {
-            // BEACON 모드로 변경 (Master 모드에서 Beacon 모드로 전환)
-            if (mMasterFlag) {
-                At.Lib_EnableMaster(false) // Master 모드 해제
-                mMasterFlag = false
-                runOnUiThread {
-                    switchBeaconMaster.isChecked = false // UI 업데이트
-                    SendPromptMsg("Switched to BEACON mode for advertising")
-                }
-                Log.d("MainActivity", "Automatically switched from MASTER to BEACON mode")
-            }
-            
-            val ret = At.Lib_EnableBeacon(true)
-            Log.d("MainActivity", "sendAdvertise-ret: " + ret)
-            
-            runOnUiThread {
-                when (ret) {
-                    0 -> {
-                        SendPromptMsg("Start beacon succeeded!\n")
-                        SendPromptMsg("Note: Effective immediately; Power-off preservation.\n")
-                        isBeaconActive = true // Beacon이 활성화된 상태
-                    }
-                    -2500 -> SendPromptMsg("Beacon start failed: Communication timeout\n")
-                    -2501 -> SendPromptMsg("Beacon start failed: Wrong length\n")
-                    -2502 -> SendPromptMsg("Beacon start failed: Communication error\n")
-                    -2503 -> SendPromptMsg("Beacon start failed: Wrong data\n")
-                    -2504 -> SendPromptMsg("Beacon start failed: Wrong command\n")
-                    -2505 -> SendPromptMsg("Beacon start failed: EDC error\n")
-                    -2506 -> SendPromptMsg("Beacon start failed: Other error\n")
-                    -2507 -> SendPromptMsg("Beacon start failed: CRC16 error\n")
-                    -2508 -> SendPromptMsg("Beacon start failed: Open failed\n")
-                    -2509 -> SendPromptMsg("Beacon start failed: Send error\n")
-                    -2510 -> SendPromptMsg("Beacon start failed: Receive error\n")
-                    else -> SendPromptMsg("Beacon start failed, return: ${ret}\n")
-                }
-                
-                // 이전에 스캔 중이었다면 자동으로 다시 시작 (Master 모드로 전환 후)
-                if (wasScanningBeforeAdvertise && ret == 0) {
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        if (!isScanning) {
-                            // Master 모드로 다시 전환하고 스캔 재개
-                            mMasterFlag = true
-                            switchBeaconMaster.isChecked = true
-                            toggleScan()
-                            Log.d("MainActivity", "Scan resumed after advertising")
-                        }
-                    }, 1000) // 1초 후 스캔 재개
-                }
-            }
-        }.start()
-    }
-
-    public fun stopAdvertise() {
-        Thread {
-            val ret = At.Lib_EnableBeacon(false)
-            
-            runOnUiThread {
-                if (ret == 0) {
-                    SendPromptMsg("Stop beacon succeeded!\n")
-                    SendPromptMsg("Note: Effective immediately; Power-off preservation.\n")
-                    isBeaconActive = false // Beacon이 비활성화된 상태
-                } else {
-                    SendPromptMsg("Stop beacon failed, return: $ret\n")
-                }
-            }
-        }.start()
     }
 
     fun SendPromptMsg(strInfo: String?) {
