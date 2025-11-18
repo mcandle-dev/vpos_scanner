@@ -37,7 +37,6 @@ import vpos.apipackage.At
 class MainActivity : AppCompatActivity() {
     private lateinit var recyclerView: RecyclerView
     private lateinit var btn3: Button
-    private lateinit var btnConnect: Button
 
     private var bleScan = BleScan() // BleScan 인스턴스 생성
     private var isScanning = false // 상태 변수 추가
@@ -79,12 +78,6 @@ class MainActivity : AppCompatActivity() {
         btn3.setOnClickListener {
             toggleScan()
             Log.d("MainActivity", "Button 3 clicked")
-        }
-
-        // Connect 버튼 - 선택된 디바이스 없이는 동작하지 않음
-        btnConnect = findViewById(R.id.btn_advertise)
-        btnConnect.setOnClickListener {
-            SendPromptMsg("디바이스를 먼저 선택하세요")
         }
 
         // 🔹 BleScan에서 데이터를 받을 콜백 설정
