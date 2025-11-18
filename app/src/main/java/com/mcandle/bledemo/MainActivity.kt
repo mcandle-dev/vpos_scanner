@@ -7,7 +7,6 @@ import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.Button
-import android.widget.CompoundButton
 import android.widget.EditText
 import android.widget.RadioButton
 import android.widget.RadioGroup
@@ -16,7 +15,6 @@ import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.SwitchCompat
 import androidx.appcompat.widget.Toolbar
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -32,7 +30,6 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import vpos.apipackage.At
-import vpos.apipackage.Beacon
 
 
 
@@ -40,15 +37,11 @@ import vpos.apipackage.Beacon
 class MainActivity : AppCompatActivity() {
     private lateinit var recyclerView: RecyclerView
     private lateinit var btn3: Button
-    private lateinit var btnAdvertise: Button
-    private lateinit var switchBeaconMaster: SwitchCompat
 
-    private var bleScan = BleScan() // BleScan 인스턴스 생성can()
+    private var bleScan = BleScan() // BleScan 인스턴스 생성
     private var isScanning = false // 상태 변수 추가
     private var scanJob: Job? = null // 코루틴 Job 저장 변수
     private var mStartFlag = false
-    private var isBeaconActive = false // Beacon 활성화 상태 (true: 활성화, false: 비활성화)
-    private var mMasterFlag = false // BEACON/MASTER 모드 플래그
 
 
     private val deviceList = mutableListOf<DeviceModel>()
@@ -81,23 +74,10 @@ class MainActivity : AppCompatActivity() {
         recyclerView.adapter = adapter
         recyclerView.layoutManager = LinearLayoutManager(this)
 
-        // BEACON/MASTER 스위치 설정
-        switchBeaconMaster = findViewById(R.id.BeaconMaster)
-        switchBeaconMaster.setOnCheckedChangeListener { _, isChecked ->
-            mMasterFlag = isChecked
-            Log.d("MainActivity", "Mode switched to: ${if (isChecked) "MASTER" else "BEACON"}")
-        }
-
         btn3 = findViewById(R.id.btn3)
         btn3.setOnClickListener {
             toggleScan()
             Log.d("MainActivity", "Button 3 clicked")
-        }
-
-        // 🔹 Advertise 버튼 연결
-        btnAdvertise = findViewById(R.id.btn_advertise)
-        btnAdvertise.setOnClickListener {
-            BLEAdvertiseDialogFragment().show(supportFragmentManager, "BLE_ADVERTISE")
         }
 
         // 🔹 BleScan에서 데이터를 받을 콜백 설정
@@ -247,24 +227,17 @@ class MainActivity : AppCompatActivity() {
             // Stop Scan
             stopScan()
         } else {
-            // Start Scan - Beacon 모드이면 자동으로 Master 모드로 변경
-            if (!mMasterFlag) {
-                mMasterFlag = true
-                switchBeaconMaster.isChecked = true // UI 업데이트
-                SendPromptMsg("Switched to MASTER mode for scanning")
-                Log.d("MainActivity", "Automatically switched to MASTER mode")
-            }
-            
+            // Start Scan
             isScanning = true
             btn3.text = "Stop"
 
-            // ✅ 스캔 시작 전에 기존 리스트 초기화
+            // 스캔 시작 전에 기존 리스트 초기화
             deviceList.clear()
             adapter.notifyDataSetChanged()
 
             // 코루틴 실행 (백그라운드에서 실행)
             scanJob = CoroutineScope(Dispatchers.IO).launch {
-                // Master 모드 확인 및 설정
+                // Master 모드 설정
                 At.Lib_EnableMaster(true)
                 startBleScan()
             }
@@ -587,67 +560,21 @@ class MainActivity : AppCompatActivity() {
 
     override fun finish() {
         Log.d("MainActivity", "=== finish() called ===")
-        Log.d("MainActivity", "isBeaconActive: $isBeaconActive")
-        Log.d("MainActivity", "mMasterFlag: $mMasterFlag")
         Log.d("MainActivity", "isScanning: $isScanning")
-        
-        if (isBeaconActive || isScanning) {
-            Log.d("MainActivity", "Beacon active or scanning - showing dialog")
-            val message = when {
-                isBeaconActive && isScanning -> "Beacon is active and scanning is running. Do you want to stop both before closing?"
-                isBeaconActive -> "Beacon is currently active. Do you want to disable it before closing?"
-                isScanning -> "Scanning is currently running. Do you want to stop it before closing?"
-                else -> "Do you want to exit?"
-            }
-            
-            AlertDialog.Builder(this)
-                .setTitle("Exit Application")
-                .setMessage(message)
-                .setCancelable(false)
-                .setPositiveButton("Yes") { _, _ ->
-                    Log.d("MainActivity", "User chose YES - stopping services")
-                    Thread {
-                        if (isBeaconActive) {
-                            At.Lib_EnableBeacon(false)
-                            Log.d("MainActivity", "Beacon disabled")
-                        }
-                        if (isScanning) {
-                            isScanning = false
-                            scanJob?.cancel()
-                            bleScan.stopScan()
-                            Log.d("MainActivity", "Scanning stopped")
-                        }
-                        runOnUiThread {
-                            super.finish()
-                        }
-                    }.start()
-                }
-                .setNegativeButton("No") { _, _ ->
-                    Log.d("MainActivity", "User chose NO - finishing without stopping services")
-                    super.finish()
-                }
-                .show()
-            return
-        }
-        
+
         // 스캔 중인 경우 중지
         if (isScanning) {
             Log.d("MainActivity", "Stopping scan before finish")
-            isScanning = false
-            scanJob?.cancel()
-            bleScan.stopScan()
+            stopScan()
         }
-        
+
         Log.d("MainActivity", "Calling super.finish()")
         super.finish()
     }
 
     override fun onBackPressed() {
         Log.d("MainActivity", "=== onBackPressed() called ===")
-        Log.d("MainActivity", "isBeaconActive: $isBeaconActive")
-        Log.d("MainActivity", "mMasterFlag: $mMasterFlag") 
         Log.d("MainActivity", "isScanning: $isScanning")
-        Log.d("MainActivity", "About to call finish()")
         finish()
     }
 
