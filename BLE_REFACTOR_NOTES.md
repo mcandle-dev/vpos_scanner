@@ -343,3 +343,133 @@ D/BleConnection: Disconnect response: OK
 - [x] TEST_MODE 추가
 - [x] GitHub Actions 설정
 - [x] 변경사항 커밋 및 푸시
+
+---
+
+## Mobile Payment AT Command 상세 흐름
+
+### 전체 사용자 흐름
+
+```
+[Start 버튼] → 스캔 시작
+    ↓
+[디바이스 클릭] → Payment Dialog
+    ↓
+[Mobile Payment 버튼] → Connect Dialog 열림
+    ↓
+[Connect 버튼] → AT Command 시작
+```
+
+---
+
+### AT Command 상세
+
+#### 1. Connect 버튼 클릭 시
+
+```
+┌─────────────────────────────────────────────┐
+│ AT+CONNECT=,XX:XX:XX:XX:XX:XX\r\n           │
+├─────────────────────────────────────────────┤
+│ 응답: OK\r\n{MAC} CONNECTED {handle}        │
+│ 예: OK\r\n5C:02:72:26:55:88 CONNECTED 1     │
+└─────────────────────────────────────────────┘
+```
+
+**BleConnection.kt** Line 64-67:
+```kotlin
+val connectCmd = "AT+CONNECT=,$macAddress\r\n"
+val cmdBytes = connectCmd.toByteArray()
+val sendResult = At.Lib_ComSend(cmdBytes, cmdBytes.size)
+```
+
+---
+
+#### 2. Send 버튼 클릭 시
+
+**Step 1: 송신 준비**
+```
+┌─────────────────────────────────────────────┐
+│ AT+SEND={handle},{length},{timeout}\r\n     │
+│ 예: AT+SEND=1,10,5000\r\n                   │
+├─────────────────────────────────────────────┤
+│ 응답: OK\r\nINPUT_BLE_DATA:{length}         │
+│ 예: OK\r\nINPUT_BLE_DATA:10                 │
+└─────────────────────────────────────────────┘
+```
+
+**Step 2: 실제 데이터 전송**
+```
+┌─────────────────────────────────────────────┐
+│ {actual_data_bytes}                         │
+│ 예: "HelloWorld" (10 bytes)                 │
+├─────────────────────────────────────────────┤
+│ 응답: OK                                    │
+└─────────────────────────────────────────────┘
+```
+
+**BleConnection.kt** Line 196-210:
+```kotlin
+val sendCmd = "AT+SEND=$handle,${data.size},$timeout\r\n"
+At.Lib_ComSend(cmdBytes, cmdBytes.size)
+// 응답 확인: INPUT_BLE_DATA
+At.Lib_ComSend(data, data.size)  // 실제 데이터
+```
+
+---
+
+#### 3. 수신 대기 (자동)
+
+```
+┌─────────────────────────────────────────────┐
+│ At.Lib_ComRecvAT() 호출 (Blocking)          │
+├─────────────────────────────────────────────┤
+│ 응답: +RECEIVED:{data}                      │
+│ 예: +RECEIVED:RESPONSE_OK                   │
+└─────────────────────────────────────────────┘
+```
+
+**BleConnection.kt** Line 267-269:
+```kotlin
+val recvResult = At.Lib_ComRecvAT(response, recvLen, timeout / 50, timeout)
+```
+
+---
+
+#### 4. Disconnect 버튼 클릭 시
+
+```
+┌─────────────────────────────────────────────┐
+│ AT+DISCE={handle}\r\n                       │
+│ 예: AT+DISCE=1\r\n                          │
+├─────────────────────────────────────────────┤
+│ 응답: OK                                    │
+└─────────────────────────────────────────────┘
+```
+
+**BleConnection.kt** Line 303-304:
+```kotlin
+val disconnectCmd = "AT+DISCE=$handle\r\n"
+At.Lib_ComSend(cmdBytes, cmdBytes.size)
+```
+
+---
+
+### AT Command 요약 테이블
+
+| 단계 | 버튼 | AT Command | 응답 |
+|------|------|------------|------|
+| 1 | Connect | `AT+CONNECT=,{MAC}\r\n` | `OK\r\n{MAC} CONNECTED {handle}` |
+| 2a | Send | `AT+SEND={h},{len},{t}\r\n` | `OK\r\nINPUT_BLE_DATA:{len}` |
+| 2b | - | `{data_bytes}` | `OK` |
+| 3 | (자동) | `Lib_ComRecvAT()` | `+RECEIVED:{data}` |
+| 4 | Disconnect | `AT+DISCE={handle}\r\n` | `OK` |
+
+---
+
+### 선택적 AT Command (현재 미사용)
+
+| Command | 용도 | 예시 |
+|---------|------|------|
+| `AT+UUID_SCAN=1\r\n` | 서비스/Characteristic 조회 | 응답에 CHAR 목록 |
+| `AT+TRX_CHAN={h},{w},{n},{t}\r\n` | Write/Notify 채널 설정 | `AT+TRX_CHAN=1,3,2,0` |
+
