@@ -24,6 +24,11 @@ class BleConnection(private val context: Context) {
 
         // 테스트 모드 (true로 설정하면 Mock 응답 사용)
         var TEST_MODE = false
+
+        // Hex 변환 유틸리티
+        private fun bytesToHex(bytes: ByteArray): String {
+            return bytes.joinToString(" ") { String.format("%02X", it) }
+        }
     }
 
     // 연결 상태
@@ -67,7 +72,11 @@ class BleConnection(private val context: Context) {
             val connectCmd = "AT+CONNECT=,$macAddress\r\n"
             val cmdBytes = connectCmd.toByteArray()
 
+            Log.i(TAG, ">>> SEND CMD: $connectCmd")
+            Log.i(TAG, ">>> SEND HEX: ${bytesToHex(cmdBytes)}")
+
             val sendResult = At.Lib_ComSend(cmdBytes, cmdBytes.size)
+            Log.i(TAG, ">>> SEND Result: $sendResult")
             if (sendResult < 0) {
                 Log.e(TAG, "Failed to send connect command: $sendResult")
                 return ConnectionResult.Error("Connect 명령 전송 실패: $sendResult")
@@ -78,25 +87,34 @@ class BleConnection(private val context: Context) {
             val recvLen = IntArray(1)
             val recvResult = At.Lib_ComRecvAT(response, recvLen, CONNECT_TIMEOUT / 50, CONNECT_TIMEOUT)
 
-            if (recvResult < 0 || recvLen[0] <= 0) {
+            Log.i(TAG, "<<< RECV Result: $recvResult, len=${recvLen[0]}")
+
+            // 데이터가 있으면 파싱 시도 (에러 코드와 무관하게)
+            if (recvLen[0] > 0) {
+                val responseStr = String(response, 0, recvLen[0]).trim()
+                Log.i(TAG, "<<< RECV STR: $responseStr")
+                Log.i(TAG, "<<< RECV HEX: ${bytesToHex(response.copyOf(recvLen[0]))}")
+
+                // 응답 파싱: "OK\r\n5C:02:72:26:55:88 CONNECTED 1"
+                val handle = parseConnectResponse(responseStr)
+                if (handle != null) {
+                    connectedHandle = handle
+                    targetMacAddress = macAddress
+                    Log.d(TAG, "Connected successfully, handle: $handle")
+                    return ConnectionResult.Success(handle)
+                } else {
+                    Log.e(TAG, "Failed to parse connect response")
+                    return ConnectionResult.Error("연결 응답 파싱 실패: $responseStr")
+                }
+            }
+
+            // 데이터 없고 에러면 실패
+            if (recvResult < 0) {
                 Log.e(TAG, "Failed to receive connect response: $recvResult, len=${recvLen[0]}")
                 return ConnectionResult.Error("Connect 응답 수신 실패")
             }
 
-            val responseStr = String(response, 0, recvLen[0]).trim()
-            Log.d(TAG, "Connect response: $responseStr")
-
-            // 응답 파싱: "OK\r\n5C:02:72:26:55:88 CONNECTED 1"
-            val handle = parseConnectResponse(responseStr)
-            if (handle != null) {
-                connectedHandle = handle
-                targetMacAddress = macAddress
-                Log.d(TAG, "Connected successfully, handle: $handle")
-                return ConnectionResult.Success(handle)
-            } else {
-                Log.e(TAG, "Failed to parse connect response")
-                return ConnectionResult.Error("연결 응답 파싱 실패: $responseStr")
-            }
+            return ConnectionResult.Error("연결 응답 없음")
 
         } catch (e: Exception) {
             Log.e(TAG, "Connect exception", e)
@@ -115,7 +133,11 @@ class BleConnection(private val context: Context) {
             val scanCmd = "AT+UUID_SCAN=1\r\n"
             val cmdBytes = scanCmd.toByteArray()
 
+            Log.i(TAG, ">>> SEND CMD: $scanCmd")
+            Log.i(TAG, ">>> SEND HEX: ${bytesToHex(cmdBytes)}")
+
             val sendResult = At.Lib_ComSend(cmdBytes, cmdBytes.size)
+            Log.i(TAG, ">>> SEND Result: $sendResult")
             if (sendResult < 0) {
                 return UuidScanResult.Error("UUID_SCAN 명령 전송 실패")
             }
@@ -124,12 +146,14 @@ class BleConnection(private val context: Context) {
             val recvLen = IntArray(1)
             val recvResult = At.Lib_ComRecvAT(response, recvLen, SEND_TIMEOUT / 50, SEND_TIMEOUT)
 
+            Log.i(TAG, "<<< RECV Result: $recvResult, len=${recvLen[0]}")
             if (recvResult < 0 || recvLen[0] <= 0) {
                 return UuidScanResult.Error("UUID_SCAN 응답 수신 실패")
             }
 
             val responseStr = String(response, 0, recvLen[0]).trim()
-            Log.d(TAG, "UUID scan response: $responseStr")
+            Log.i(TAG, "<<< RECV STR: $responseStr")
+            Log.i(TAG, "<<< RECV HEX: ${bytesToHex(response.copyOf(recvLen[0]))}")
 
             val channels = parseUuidScanResponse(responseStr)
             return UuidScanResult.Success(channels)
@@ -155,7 +179,11 @@ class BleConnection(private val context: Context) {
             val trxCmd = "AT+TRX_CHAN=$handle,$writeCh,$notifyCh,$type\r\n"
             val cmdBytes = trxCmd.toByteArray()
 
+            Log.i(TAG, ">>> SEND CMD: $trxCmd")
+            Log.i(TAG, ">>> SEND HEX: ${bytesToHex(cmdBytes)}")
+
             val sendResult = At.Lib_ComSend(cmdBytes, cmdBytes.size)
+            Log.i(TAG, ">>> SEND Result: $sendResult")
             if (sendResult < 0) {
                 Log.e(TAG, "Failed to send TRX_CHAN command")
                 return false
@@ -165,9 +193,11 @@ class BleConnection(private val context: Context) {
             val recvLen = IntArray(1)
             val recvResult = At.Lib_ComRecvAT(response, recvLen, DEFAULT_TIMEOUT / 50, DEFAULT_TIMEOUT)
 
+            Log.i(TAG, "<<< RECV Result: $recvResult, len=${recvLen[0]}")
             if (recvResult >= 0 && recvLen[0] > 0) {
                 val responseStr = String(response, 0, recvLen[0]).trim()
-                Log.d(TAG, "TRX_CHAN response: $responseStr")
+                Log.i(TAG, "<<< RECV STR: $responseStr")
+                Log.i(TAG, "<<< RECV HEX: ${bytesToHex(response.copyOf(recvLen[0]))}")
 
                 if (responseStr.contains("OK")) {
                     writeChannel = writeCh
@@ -208,7 +238,11 @@ class BleConnection(private val context: Context) {
             val sendCmd = "AT+SEND=$handle,${data.size},$timeout\r\n"
             val cmdBytes = sendCmd.toByteArray()
 
+            Log.i(TAG, ">>> SEND CMD: $sendCmd")
+            Log.i(TAG, ">>> SEND HEX: ${bytesToHex(cmdBytes)}")
+
             val sendResult = At.Lib_ComSend(cmdBytes, cmdBytes.size)
+            Log.i(TAG, ">>> SEND Result: $sendResult")
             if (sendResult < 0) {
                 return SendResult.Error("SEND 명령 전송 실패")
             }
@@ -218,19 +252,24 @@ class BleConnection(private val context: Context) {
             val recvLen = IntArray(1)
             val recvResult = At.Lib_ComRecvAT(response, recvLen, DEFAULT_TIMEOUT / 50, DEFAULT_TIMEOUT)
 
+            Log.i(TAG, "<<< RECV Result: $recvResult, len=${recvLen[0]}")
             if (recvResult < 0 || recvLen[0] <= 0) {
                 return SendResult.Error("SEND 응답 수신 실패")
             }
 
             val responseStr = String(response, 0, recvLen[0]).trim()
-            Log.d(TAG, "SEND response: $responseStr")
+            Log.i(TAG, "<<< RECV STR: $responseStr")
+            Log.i(TAG, "<<< RECV HEX: ${bytesToHex(response.copyOf(recvLen[0]))}")
 
             if (!responseStr.contains("INPUT_BLE_DATA")) {
                 return SendResult.Error("예상치 못한 응답: $responseStr")
             }
 
             // 3. 실제 데이터 전송
+            Log.i(TAG, ">>> DATA SEND: ${String(data)}")
+            Log.i(TAG, ">>> DATA HEX: ${bytesToHex(data)}")
             val dataSendResult = At.Lib_ComSend(data, data.size)
+            Log.i(TAG, ">>> DATA Result: $dataSendResult")
             if (dataSendResult < 0) {
                 return SendResult.Error("데이터 전송 실패")
             }
@@ -240,9 +279,11 @@ class BleConnection(private val context: Context) {
             val finalLen = IntArray(1)
             val finalResult = At.Lib_ComRecvAT(finalResponse, finalLen, timeout / 50, timeout)
 
+            Log.i(TAG, "<<< FINAL Result: $finalResult, len=${finalLen[0]}")
             if (finalResult >= 0 && finalLen[0] > 0) {
                 val finalStr = String(finalResponse, 0, finalLen[0]).trim()
-                Log.d(TAG, "Final send response: $finalStr")
+                Log.i(TAG, "<<< FINAL STR: $finalStr")
+                Log.i(TAG, "<<< FINAL HEX: ${bytesToHex(finalResponse.copyOf(finalLen[0]))}")
 
                 if (finalStr.contains("OK")) {
                     return SendResult.Success
@@ -287,16 +328,20 @@ class BleConnection(private val context: Context) {
             val recvLen = IntArray(1)
             val recvResult = At.Lib_ComRecvAT(response, recvLen, timeout / 50, timeout)
 
+            Log.i(TAG, "<<< RECV Result: $recvResult, len=${recvLen[0]}")
             if (recvResult < 0) {
+                Log.i(TAG, "<<< RECV Timeout (result < 0)")
                 return ReceiveResult.Timeout
             }
 
             if (recvLen[0] <= 0) {
+                Log.i(TAG, "<<< RECV Timeout (len <= 0)")
                 return ReceiveResult.Timeout
             }
 
             val responseStr = String(response, 0, recvLen[0])
-            Log.d(TAG, "Received: $responseStr")
+            Log.i(TAG, "<<< RECV STR: $responseStr")
+            Log.i(TAG, "<<< RECV HEX: ${bytesToHex(response.copyOf(recvLen[0]))}")
 
             // +RECEIVED: prefix 확인 및 데이터 추출
             val data = parseReceivedData(responseStr)
@@ -335,7 +380,11 @@ class BleConnection(private val context: Context) {
             val disconnectCmd = "AT+DISCE=$handle\r\n"
             val cmdBytes = disconnectCmd.toByteArray()
 
+            Log.i(TAG, ">>> SEND CMD: $disconnectCmd")
+            Log.i(TAG, ">>> SEND HEX: ${bytesToHex(cmdBytes)}")
+
             val sendResult = At.Lib_ComSend(cmdBytes, cmdBytes.size)
+            Log.i(TAG, ">>> SEND Result: $sendResult")
             if (sendResult < 0) {
                 Log.e(TAG, "Failed to send disconnect command")
                 // 상태는 초기화
@@ -348,9 +397,11 @@ class BleConnection(private val context: Context) {
             val recvLen = IntArray(1)
             At.Lib_ComRecvAT(response, recvLen, DEFAULT_TIMEOUT / 50, DEFAULT_TIMEOUT)
 
+            Log.i(TAG, "<<< RECV Result: len=${recvLen[0]}")
             if (recvLen[0] > 0) {
                 val responseStr = String(response, 0, recvLen[0]).trim()
-                Log.d(TAG, "Disconnect response: $responseStr")
+                Log.i(TAG, "<<< RECV STR: $responseStr")
+                Log.i(TAG, "<<< RECV HEX: ${bytesToHex(response.copyOf(recvLen[0]))}")
             }
 
             connectedHandle = null

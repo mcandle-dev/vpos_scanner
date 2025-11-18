@@ -126,7 +126,7 @@ class MainActivity : AppCompatActivity() {
 
     // 1) 스캔 시작 (IO)
     private fun startBleScan() {
-        val sharedPreferences = getSharedPreferences("MyPrefs", MODE_PRIVATE)
+        val sharedPreferences = getSharedPreferences("scanInfo", MODE_PRIVATE)
         val scanResultListener = object : BleScan.ScanResultListener {
             override fun onScanResult(scanData: JSONArray) {
                 // 결과 들어올 때마다 백그라운드 파싱으로 위임
@@ -151,39 +151,59 @@ class MainActivity : AppCompatActivity() {
                 val address = jsonObj.optString("MAC") ?: "Unknown"
                 val rssi = jsonObj.optInt("RSSI", -100)
 
-                var name = "Unknown"
-                // RSP 패킷에서 Device Name 확인
-                if (jsonObj.has("RSP")) {
-                    val rspObj = jsonObj.getJSONObject("RSP")
-                    name = rspObj.optString("Device Name", "Unknown")
-                }
-                // ADV 패킷에서도 Device Name 확인 (RSP에서 못 찾았을 때)
-                if (name == "Unknown" && jsonObj.has("ADV")) {
-                    val advObj = jsonObj.getJSONObject("ADV")
-                    name = advObj.optString("Device Name", "Unknown")
+                // BeaconActivity.java 로직 참조: ADV 먼저, RSP 나중
+                var name: String? = null
+                var uuid: String? = null
+
+                val advObj = if (jsonObj.has("ADV")) jsonObj.getJSONObject("ADV") else null
+                val rspObj = if (jsonObj.has("RSP")) jsonObj.getJSONObject("RSP") else null
+
+                // ADV에서 먼저 확인
+                if (advObj != null) {
+                    val advName = advObj.optString("Device Name", "")
+                    if (advName.isNotEmpty()) {
+                        name = advName
+                    }
+                    val advUuid = advObj.optString("Service UUIDs", "")
+                    if (advUuid.isNotEmpty()) {
+                        uuid = advUuid
+                    }
                 }
 
-                // Service UUIDs 키 변형 대응: "Service UUIDs" / "ServiceUUIDs"
-                val serviceUuid: String = if (jsonObj.has("ADV")) {
-                    val advObj = jsonObj.getJSONObject("ADV")
-                    val raw = advObj.optString(
-                        "Service UUIDs",
-                        advObj.optString("ServiceUUIDs", "")
-                    )
-                    raw.trim().split(Regex("\\s+")).firstOrNull() ?: ""
+                // RSP에서 확인 (ADV에서 못 찾았을 때)
+                if (rspObj != null && uuid.isNullOrEmpty()) {
+                    val rspUuid = rspObj.optString("Service UUIDs", "")
+                    if (rspUuid.isNotEmpty()) {
+                        uuid = rspUuid
+                    }
+                }
+                if (rspObj != null && name.isNullOrEmpty()) {
+                    val rspName = rspObj.optString("Device Name", "")
+                    if (rspName.isNotEmpty()) {
+                        name = rspName
+                    }
+                }
+
+                // 최종적으로 없으면 Unknown
+                val finalName = if (name.isNullOrEmpty()) "Unknown" else name
+
+                Log.d("MainActivity", "Final parsed: MAC=$address, name=$finalName")
+
+                // Service UUID는 이미 위에서 파싱됨, 정리만 수행
+                val serviceUuid: String = uuid?.trim()?.split(Regex("\\s+"))?.firstOrNull() ?: ""
+
+                val serviceData: String = if (advObj != null && advObj.has("Service Data")) {
+                    val serviceDataArray = advObj.optJSONArray("Service Data")
+                    serviceDataArray?.optString(0, "") ?: ""
                 } else ""
 
-                val serviceData: String = if (jsonObj.has("ADV")) {
-                    jsonObj.getJSONObject("ADV").optString("Service Data", "")
-                } else ""
-
-                val manufacturerData: String = if (jsonObj.has("ADV")) {
-                    jsonObj.getJSONObject("ADV").optString("Manufacturer Data", "")
+                val manufacturerData: String = if (advObj != null) {
+                    advObj.optString("Manufacturer Data", "")
                 } else ""
 
                 newDevices.add(
                     DeviceModel(
-                        name = name,
+                        name = finalName,
                         address = address,
                         rssi = rssi,
                         serviceUuids = serviceUuid,
@@ -195,7 +215,12 @@ class MainActivity : AppCompatActivity() {
 
             // 디바운스: 최근 UI 반영 후 300ms 이내면 스킵
             val now = System.currentTimeMillis()
-            if (now - lastUiPost < UI_POST_INTERVAL) return@launch
+            val timeSinceLastPost = now - lastUiPost
+            if (timeSinceLastPost < UI_POST_INTERVAL) {
+                Log.d("MainActivity", "Debounce: skipped (${timeSinceLastPost}ms < ${UI_POST_INTERVAL}ms)")
+                return@launch
+            }
+            Log.d("MainActivity", "Debounce: passed, updating UI with ${newDevices.size} devices")
             lastUiPost = now
 
             withContext(Dispatchers.Main) {
@@ -217,10 +242,14 @@ class MainActivity : AppCompatActivity() {
     fun stopScan() {
         if (isScanning) {
             isScanning = false
-            btn3.text = "Start"
             scanJob?.cancel()
             bleScan.stopScan()
             Log.d("MainActivity", "Scanning stopped via stopScan()")
+
+            // UI 업데이트는 메인 스레드에서 실행
+            runOnUiThread {
+                btn3.text = "Start"
+            }
         }
     }
 
@@ -248,36 +277,34 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showPaymentDialog(device: DeviceModel) {
-        // 예시: serviceUuids에서 값 추출 (구체적 데이터 구조에 따라 맞게 수정)
+        // Service Data에서 값 추출 (Hex → ASCII 변환)
+        // "31 32 33 34..." → "1234..."
+        val asciiData = try {
+            device.serviceData.trim()
+                .split(Regex("\\s+"))
+                .filter { it.isNotEmpty() }
+                .map { Integer.parseInt(it, 16).toChar() }
+                .joinToString("")
+        } catch (e: Exception) {
+            ""
+        }
 
-        val phoneNumber = { addr: String? ->
-            addr?.filter(Char::isDigit)  // 숫자만 남기기
-                ?.drop(16)               // 앞 16자리 버리기
-                ?.take(4)                // 다음 4자리만
-                ?: ""
-        }(device.serviceUuids)
+        // 전화번호: 뒤 4자리
+        val phoneNumber = if (asciiData.length >= 20) asciiData.takeLast(4) else ""
 
-        val orderNumber = { addr: String? ->
-            addr?.filter(Char::isDigit)  // 숫자만 남기기
-                ?.take(8)                // 다음 4자리만
-                ?: "12345678"
-        }(device.serviceUuids)
+        // 주문번호: 앞 8자리
+        val orderNumber = if (asciiData.length >= 8) asciiData.take(8) else "12345678"
 
         val dialogView = layoutInflater.inflate(R.layout.dialog_payment_info, null)
         val tvCardNumber = dialogView.findViewById<TextView>(R.id.tvCardNumber)
         val tvPhone = dialogView.findViewById<TextView>(R.id.tvPhone)
         val etOrderNumber = dialogView.findViewById<EditText>(R.id.etOrderNumber)
 
-        tvPhone.text =  "$phoneNumber 님"
-        // 카드번호와 전화번호 UI 표시
-        tvCardNumber.text = { addr: String? ->
-            addr
-                ?.filter(Char::isDigit)          // 1. 숫자만 남김 (하이픈 제거)
-                ?.take(16)                        // 2. 앞 16자리만
-                ?.chunked(4)                      // 3. 4자리씩 나눔
-                ?.joinToString("-")               // 4. 하이픈으로 연결
-                ?: ""
-        }(device.serviceUuids)
+        tvPhone.text = "$phoneNumber 님"
+        // 카드번호: 앞 16자리
+        tvCardNumber.text = if (asciiData.length >= 16) {
+            asciiData.take(16).chunked(4).joinToString("-")
+        } else ""
         etOrderNumber.setText(orderNumber)
 
         val dialog = AlertDialog.Builder(this)
@@ -287,8 +314,8 @@ class MainActivity : AppCompatActivity() {
 
         dialogView.findViewById<Button>(R.id.btnMobilePayment).setOnClickListener {
             dialog.dismiss()
-            // Connect Dialog 표시
-            BLEConnectDialogFragment.newInstance(device).show(supportFragmentManager, "BLE_CONNECT")
+            // Connect Dialog 표시 (주문번호 전달)
+            BLEConnectDialogFragment.newInstance(device, orderNumber).show(supportFragmentManager, "BLE_CONNECT")
         }
         dialogView.findViewById<Button>(R.id.btnOfflinePayment).setOnClickListener {
             // TODO: 오프라인 결제 처리
@@ -318,7 +345,7 @@ class MainActivity : AppCompatActivity() {
         val rbBLE = inputLayout.findViewById<RadioButton>(R.id.rbBLE)
 
         val scanSp = getSharedPreferences("scanInfo", MODE_PRIVATE)
-        etBroadcastName.setText(scanSp.getString("broadcastName", "MCan"))
+        etBroadcastName.setText(scanSp.getString("broadcastName", ""))
 
         val sp = getSharedPreferences("beaconInfo", MODE_PRIVATE)
 

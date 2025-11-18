@@ -29,12 +29,14 @@ class BLEConnectDialogFragment : DialogFragment() {
     companion object {
         private const val ARG_DEVICE_NAME = "device_name"
         private const val ARG_DEVICE_MAC = "device_mac"
+        private const val ARG_ORDER_NUMBER = "order_number"
 
-        fun newInstance(device: DeviceModel): BLEConnectDialogFragment {
+        fun newInstance(device: DeviceModel, orderNumber: String = ""): BLEConnectDialogFragment {
             return BLEConnectDialogFragment().apply {
                 arguments = Bundle().apply {
                     putString(ARG_DEVICE_NAME, device.name)
                     putString(ARG_DEVICE_MAC, device.address)
+                    putString(ARG_ORDER_NUMBER, orderNumber)
                 }
             }
         }
@@ -60,6 +62,7 @@ class BLEConnectDialogFragment : DialogFragment() {
     // 디바이스 정보
     private var deviceName: String = ""
     private var deviceMac: String = ""
+    private var orderNumber: String = ""
 
     // 연결 상태
     private var isConnected = false
@@ -71,6 +74,7 @@ class BLEConnectDialogFragment : DialogFragment() {
         arguments?.let {
             deviceName = it.getString(ARG_DEVICE_NAME, "Unknown")
             deviceMac = it.getString(ARG_DEVICE_MAC, "")
+            orderNumber = it.getString(ARG_ORDER_NUMBER, "")
         }
 
         bleConnection = BleConnection(requireContext())
@@ -99,11 +103,16 @@ class BLEConnectDialogFragment : DialogFragment() {
         btnDisconnect = view.findViewById(R.id.btnDisconnect)
         btnClose = view.findViewById(R.id.btnClose)
         tvReceivedLog = view.findViewById(R.id.tvReceivedLog)
-        scrollView = view.findViewById<ScrollView>(R.id.tvReceivedLog).parent as ScrollView
+        scrollView = tvReceivedLog.parent as ScrollView
 
         // 디바이스 정보 표시
         tvDeviceName.text = deviceName
         tvDeviceMac.text = deviceMac
+
+        // 송신 데이터 기본값 설정 (주문번호)
+        if (orderNumber.isNotEmpty()) {
+            etSendData.setText(orderNumber)
+        }
 
         // 버튼 리스너 설정
         setupButtonListeners()

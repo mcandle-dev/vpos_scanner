@@ -72,9 +72,8 @@ public class BleScan {
 
     public void startScanAsync(SharedPreferences sp, ScanResultListener listener) {
         startScan(sp, listener);
-        if (isScanning) {
-            recvScanData(listener);
-        }
+        // recvScanData는 startScan 내부에서 이미 Thread로 실행됨
+        // 여기서 다시 호출하면 두 스레드가 동시에 실행되어 문제 발생
     }
     public void startScan(SharedPreferences sp, ScanResultListener listener) {
 
@@ -93,7 +92,7 @@ public class BleScan {
 
         ret = At.Lib_AtStartNewScan(
                 sp.getString("macAddress", ""),
-                sp.getString("broadcastfName", "MCan"),
+                sp.getString("broadcastName", ""),
                 -sp.getInt("rssi", 0),
                 sp.getString("manufacturerId", ""),
                 sp.getString("data", "")
@@ -119,20 +118,22 @@ public class BleScan {
         byte[] recvData =new byte[2048];
         int[] recvDataLen =new int[2];
         String lineLeft="";
+        Map<String, JSONObject> deviceMap = new ConcurrentHashMap<>();  // 루프 밖에서 누적 관리
 
 
         while (isScanning) {
             int ret = At.Lib_ComRecvAT(recvData, recvDataLen, 20, 1000);
             Log.e("recvScanData", "runLib_ComRecvAT: recvDataLen"+recvDataLen[0] );
             Log.e("recvScanData", "Lib_ComRecvAT recvData: "+bytesToHex(recvData,recvDataLen[0]));
-            Map<String, JSONObject> deviceMap = new ConcurrentHashMap<>();
             boolean startProcessing = false;
 
             // String buff= lineLeft+new String(recvData);
             String buff= lineLeft+new String(recvData, 0, recvDataLen[0]);
+            Log.e("recvScanData", "lineLeft: [" + lineLeft + "]");
+            Log.e("recvScanData", "buff: [" + buff + "]");
             // String []data=buff.split("\r\n|\r|\n");
             String []data=buff.split("\\r\\n|\\r|\\n", -1); // ����λ�������ַ���
-            //Log.e("TAG", "debug crash position:echo21" );
+            Log.e("recvScanData", "lineCount: " + data.length + ", lines: " + java.util.Arrays.toString(data));
             int lineCount=data.length;
             // if(lineCount>0)//each time response data left last line ,for maybe data not recv all.
             //     lineLeft = data[lineCount-1];
@@ -231,17 +232,18 @@ public class BleScan {
                     // ����Ѿ���ʼ����MAC���ݣ���������MAC��ͷ�����ݣ�������
                     continue;
                 }
+            }
 
-                Log.e("deviceMap", "deviceMap" + deviceMap );
+            // for loop 완료 후 한 번만 전송 (ADV + RSP가 합쳐진 상태)
+            Log.e("deviceMap", "deviceMap" + deviceMap );
 
-                synchronized (deviceMap) {
-                    Map<String, JSONObject> snapshot = new HashMap<>(deviceMap); // 복사본 생성
-                    JSONArray resultArray = new JSONArray(snapshot.values());
-                    Log.e("resultArray", "resultArray" + resultArray );
-                    if (listener != null) {
-                        Log.e("listener", "resultArray" + resultArray );
-                        listener.onScanResult(resultArray);
-                    }
+            synchronized (deviceMap) {
+                Map<String, JSONObject> snapshot = new HashMap<>(deviceMap); // 복사본 생성
+                JSONArray resultArray = new JSONArray(snapshot.values());
+                Log.e("resultArray", "resultArray" + resultArray );
+                if (listener != null) {
+                    Log.e("listener", "resultArray" + resultArray );
+                    listener.onScanResult(resultArray);
                 }
             }
         }

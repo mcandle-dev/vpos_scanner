@@ -26,26 +26,33 @@ class BLEDeviceAdapter(
         notifyDataSetChanged()
     }
 
-    // ServiceUUID에서 멤버십 정보 파싱: "2200님 (1234 5678 5567 6666)"
-    private fun parseServiceUuidForMembership(serviceUuid: String): String {
-        if (serviceUuid.isEmpty()) return "정보 없음"
-        
-        // UUID의 의미 있는 부분만 추출 (처음 4개 그룹)
-        // 예: "12345678-9012-3456-2200-00805f9b34fb" -> "12345678-9012-3456-2200"
-        val meaningfulPart = serviceUuid.split("-").take(4).joinToString("-")
-        val digitsOnly = meaningfulPart.filter { it.isDigit() }
-        
-        if (digitsOnly.length < 18) return "데이터 부족"
-        
-        // 전화번호: 네 번째 그룹 전체 (2200)
-        val lastGroup = serviceUuid.split("-").getOrNull(3) ?: ""
-        val phoneNumber = if (lastGroup.isNotEmpty()) lastGroup else "0000"
-        
-        // 카드번호: 처음 16자리
-        val cardNumber = digitsOnly.take(16)
+    // ServiceData에서 멤버십 정보 파싱: "2200님 (1234 5678 5567 6666)"
+    // Service Data: "31 32 33 34 35 36 37 38 31 32 33 34 35 36 37 38 31 32 33 34"
+    // ASCII 변환: "12345678123456781234"
+    // 앞 16자리: 카드번호, 뒤 4자리: 전화번호
+    private fun parseServiceDataForMembership(serviceData: String): String {
+        if (serviceData.isEmpty()) return "정보 없음"
+
+        // Hex to ASCII 변환: "31 32 33 34..." -> "1234..."
+        val hexValues = serviceData.trim().split(Regex("\\s+"))
+        val asciiString = try {
+            hexValues.filter { it.isNotEmpty() }
+                .map { Integer.parseInt(it, 16).toChar() }
+                .joinToString("")
+        } catch (e: Exception) {
+            return "파싱 오류"
+        }
+
+        if (asciiString.length < 20) return "데이터 부족"
+
+        // 카드번호: 앞 16자리
+        val cardNumber = asciiString.take(16)
             .chunked(4)
             .joinToString(" ")
-        
+
+        // 전화번호: 뒤 4자리
+        val phoneNumber = asciiString.takeLast(4)
+
         return "${phoneNumber}님 ($cardNumber)"
     }
 
@@ -157,8 +164,8 @@ class BLEDeviceAdapter(
     }
 
     private fun bindMembershipDevice(holder: MembershipViewHolder, device: DeviceModel) {
-        // 멤버십 정보 파싱 및 표시
-        val membershipInfo = parseServiceUuidForMembership(device.serviceUuids)
+        // 멤버십 정보 파싱 및 표시 (Service Data 사용)
+        val membershipInfo = parseServiceDataForMembership(device.serviceData)
         holder.membershipInfoTextView.text = membershipInfo
 
         // MAC 주소
