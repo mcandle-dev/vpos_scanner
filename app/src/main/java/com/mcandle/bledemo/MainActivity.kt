@@ -42,6 +42,8 @@ class MainActivity : AppCompatActivity() {
     private var isScanning = false // 상태 변수 추가
     private var scanJob: Job? = null // 코루틴 Job 저장 변수
     private var mStartFlag = false
+    private var mMasterFlag = false // Master 모드 상태 플래그
+    private var isBeaconActive = false // Beacon 활성화 상태
 
 
     private val deviceList = mutableListOf<DeviceModel>()
@@ -380,7 +382,6 @@ class MainActivity : AppCompatActivity() {
                 At.Lib_EnableMaster(false) // Master 모드 해제
                 mMasterFlag = false
                 runOnUiThread {
-                    switchBeaconMaster.isChecked = false // UI 업데이트
                     SendPromptMsg("Switched to BEACON mode for advertising")
                 }
                 Log.d("MainActivity", "Automatically switched from MASTER to BEACON mode")
@@ -416,7 +417,6 @@ class MainActivity : AppCompatActivity() {
                         if (!isScanning) {
                             // Master 모드로 다시 전환하고 스캔 재개
                             mMasterFlag = true
-                            switchBeaconMaster.isChecked = true
                             toggleScan()
                             Log.d("MainActivity", "Scan resumed after advertising")
                         }
