@@ -32,102 +32,10 @@
         android:hint="MCan" />
 
     <TextView
-        android:id="@+id/tvConfigBeaconTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@+id/tvDeviceName"
-        android:layout_marginTop="24dp"
-        android:text="Config Beacon"
-        android:textSize="18sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:id="@+id/tvCompanyId"
-        android:layout_width="122dp"
-        android:layout_height="wrap_content"
-        android:layout_below="@+id/tvConfigBeaconTitle"
-        android:layout_marginTop="16dp"
-        android:text="Company ID: 0x"
-        android:textSize="16sp" />
-
-    <EditText
-        android:id="@+id/etCompanyId"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_alignBaseline="@+id/tvCompanyId"
-        android:layout_alignParentEnd="true"
-        android:layout_toEndOf="@+id/tvCompanyId"
-        android:digits="0123456789abcdefABCDEF"
-        android:inputType="text"
-        android:maxLength="4" />
-
-    <TextView
-        android:id="@+id/tvMajorUuid"
-        android:layout_width="122dp"
-        android:layout_height="wrap_content"
-        android:layout_below="@+id/tvCompanyId"
-        android:layout_marginTop="20dp"
-        android:text="Major(전화번호): "
-        android:textSize="16sp" />
-
-    <EditText
-        android:id="@+id/etMajorUuid"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_alignBaseline="@+id/tvMajorUuid"
-        android:layout_alignParentEnd="true"
-        android:layout_toEndOf="@+id/tvMajorUuid"
-        android:digits="0123456789"
-        android:inputType="number"
-        android:maxLength="4"
-        android:hint="끝4자리" />
-
-    <TextView
-        android:id="@+id/tvMinorUuid"
-        android:layout_width="122dp"
-        android:layout_height="wrap_content"
-        android:layout_below="@+id/tvMajorUuid"
-        android:layout_marginTop="20dp"
-        android:text="Minor:              "
-        android:textSize="16sp" />
-
-    <EditText
-        android:id="@+id/etMinorUuid"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_alignBaseline="@+id/tvMinorUuid"
-        android:layout_alignParentEnd="true"
-        android:layout_toEndOf="@+id/tvMinorUuid"
-        android:digits="0123456789"
-        android:inputType="number"
-        android:hint="정수 입력"
-         />
-
-    <TextView
-        android:id="@+id/tvCustomUuid"
-        android:layout_width="122dp"
-        android:layout_height="wrap_content"
-        android:layout_below="@+id/tvMinorUuid"
-        android:layout_marginTop="20dp"
-        android:text="Custom UUID: "
-        android:textSize="16sp" />
-
-    <EditText
-        android:id="@+id/etCustomUuid"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_alignBaseline="@+id/tvCustomUuid"
-        android:layout_alignParentEnd="true"
-        android:layout_toEndOf="@+id/tvCustomUuid"
-        android:digits="0123456789abcdefABCDEF,"
-        android:inputType="textMultiLine"
-        android:maxLength="32" />
-
-    <TextView
         android:id="@+id/tvDisplayTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_below="@+id/tvCustomUuid"
+        android:layout_below="@+id/tvDeviceName"
         android:layout_marginTop="24dp"
         android:text="Display Title"
         android:textSize="18sp"

@@ -229,14 +229,23 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    /**
+     * 스캔 중지 (public - BLEConnectDialogFragment에서 호출)
+     */
+    fun stopScan() {
+        if (isScanning) {
+            isScanning = false
+            btn3.text = "Start"
+            scanJob?.cancel()
+            bleScan.stopScan()
+            Log.d("MainActivity", "Scanning stopped via stopScan()")
+        }
+    }
+
     private fun toggleScan() {
         if (isScanning) {
             // Stop Scan
-            isScanning = false
-            btn3.text = "Start"
-            scanJob?.cancel() // 코루틴 중지
-            bleScan.stopScan() // BLE 스캔 중지
-            Log.d("MainActivity", "Scanning stopped")
+            stopScan()
         } else {
             // Start Scan - Beacon 모드이면 자동으로 Master 모드로 변경
             if (!mMasterFlag) {
@@ -302,40 +311,9 @@ class MainActivity : AppCompatActivity() {
             .create()
 
         dialogView.findViewById<Button>(R.id.btnMobilePayment).setOnClickListener {
-            // (a) SharedPreferences에서 companyId/minorUuid 불러오기 (기본값 포함)
-            val sp = getSharedPreferences("beaconInfo", MODE_PRIVATE)
-            val companyId = sp.getString("companyId", "4C00") ?: "4C00"   // 기본 0x4C00
-            val minorUuid = sp.getString("minorUuid", "0506") ?: "0506"   // 저장된 HEX(4자리) 가정
-            // (b) majorUuid = phoneNumber(전화번호 4자리) → HEX 4자리
-            val majorInt = phoneNumber.toIntOrNull() ?: 0
-            val majorUuid = String.format("%04X", majorInt)
-
-            // (c) customUuid = 주문번호(<=8) + 공백패딩(총 12자) + 전화4 → ASCII→HEX
-            val orderRaw = etOrderNumber.text.toString().trim()
-            val order8 = orderRaw.take(8)
-            val customAscii16 = order8 + " ".repeat(12 - order8.length) + phoneNumber
-            val customUuid = BLEUtils.asciiToHex(customAscii16).replace(" ", "")
-
-            // (d) 장치에 비콘 파라미터 설정 (백그라운드)
-            Thread {
-                val beacon = Beacon(companyId, majorUuid, minorUuid, customUuid)
-                val ret = At.Lib_SetBeaconParams(beacon)
-                runOnUiThread {
-                    if (ret == 0) {
-                        dialog.dismiss()
-                        // ✔ UI에서 안전하게 다이얼로그 띄우기
-                        BLEAdvertiseDialogFragment().show(supportFragmentManager, "BLE_ADVERTISE")
-                    } else {
-                        SendPromptMsg(
-                            "Config beacon failed, return: $ret\n" +
-                                    "Company ID: 0x${beacon.companyId}\n" +
-                                    "Major: 0x${beacon.major}\n" +
-                                    "Minor: 0x${beacon.minor}\n" +
-                                    "Custom UUID: 0x${beacon.customUuid}\n"
-                        )
-                    }
-                }
-            }.start()
+            dialog.dismiss()
+            // Connect Dialog 표시
+            BLEConnectDialogFragment.newInstance(device).show(supportFragmentManager, "BLE_CONNECT")
         }
         dialogView.findViewById<Button>(R.id.btnOfflinePayment).setOnClickListener {
             // TODO: 오프라인 결제 처리
@@ -360,19 +338,15 @@ class MainActivity : AppCompatActivity() {
 
         val inputLayout = layoutInflater.inflate(R.layout.item_beacon_info, null)
         val etBroadcastName = inputLayout.findViewById<EditText>(R.id.etBroadcastName)
-        val etCompanyId = inputLayout.findViewById<EditText>(R.id.etCompanyId)
-        val etMajorUuid = inputLayout.findViewById<EditText>(R.id.etMajorUuid)
-        val etMinorUuid = inputLayout.findViewById<EditText>(R.id.etMinorUuid)
-        val etCustomUuid = inputLayout.findViewById<EditText>(R.id.etCustomUuid)
         val rgDisplayTitle = inputLayout.findViewById<RadioGroup>(R.id.rgDisplayTitle)
         val rbMembership = inputLayout.findViewById<RadioButton>(R.id.rbMembership)
         val rbBLE = inputLayout.findViewById<RadioButton>(R.id.rbBLE)
 
         val scanSp = getSharedPreferences("scanInfo", MODE_PRIVATE)
         etBroadcastName.setText(scanSp.getString("broadcastName", "MCan"))
-        
+
         val sp = getSharedPreferences("beaconInfo", MODE_PRIVATE)
-        
+
         // Display Title 라디오 버튼 초기값 설정
         val savedDisplayTitle = sp.getString("displayTitle", "멤버십")
         when (savedDisplayTitle) {
@@ -380,37 +354,13 @@ class MainActivity : AppCompatActivity() {
             "BLE" -> rbBLE.isChecked = true
             else -> rbMembership.isChecked = true // 기본값: 멤버십
         }
-        etCompanyId.setText(sp.getString("companyId", "4C00"))
-
-        val hexMajor = sp.getString("majorUuid", "0898") ?: "0898"
-        val decimalMajor = String.format("%04d", hexMajor.toInt(16))
-        etMajorUuid.setText(decimalMajor)
-
-        val hexMinor = sp.getString("minorUuid", "0506") ?: "0506"
-        val decimalMinor = String.format("%04d", hexMinor.toInt(16))
-        etMinorUuid.setText(decimalMinor)
-
-        //etCustomUuid.setText(sp.getString("customUuid", "1234567890123456"))
-        // 나중 원복   0898 -> 2200 으로 변경
-
-
-        etCustomUuid.setText("1234567890123456")
         AlertDialog.Builder(this)
             .setTitle("Setting")
             .setView(inputLayout)
             .setCancelable(false)
             .setPositiveButton("OK") { dialog, _ ->
                 val broadcastName = etBroadcastName.text.toString().trim()
-                val companyId = etCompanyId.text.toString().trim()
-                val majorUuidStr = etMajorUuid.text.toString().trim()
-                val minorUuidStr = etMinorUuid.text.toString().trim()
-                // 1. 입력값 추출 및 16자리 padding
-                val customUuidInput = etCustomUuid.text.toString().trim()
-                val paddedCustomUuid = customUuidInput.padEnd(16, ' ')
 
-                // 2. 기존 BLEUtils.asciiToHex() 사용 (공백 제거 포함)
-                val customUuid = BLEUtils.asciiToHex(paddedCustomUuid).replace(" ", "")
-                
                 // Display Title 선택값 가져오기
                 val selectedDisplayTitle = when (rgDisplayTitle.checkedRadioButtonId) {
                     R.id.rbMembership -> "멤버십"
@@ -418,70 +368,20 @@ class MainActivity : AppCompatActivity() {
                     else -> "멤버십" // 기본값
                 }
 
+                // 설정 저장
+                val scanEditor = scanSp.edit()
+                scanEditor.putString("broadcastName", broadcastName)
+                scanEditor.apply()
 
-                // 1. majorUuid: 10진수 → 16진수 4자리 문자열
-                val majorInt = majorUuidStr.toIntOrNull()
-                val majorUuid = if (majorInt != null && majorInt in 0..9999) {
-                    String.format("%04X", majorInt)  // 4자리 16진수(대문자)
-                } else {
-                    ""
-                }
+                val editor = sp.edit()
+                editor.putString("displayTitle", selectedDisplayTitle)
+                editor.apply()
 
-                // 2. minorUuid: 10진수 → 16진수 문자열 (4자리로 맞추려면 "%04X" 사용)
-                val minorInt = minorUuidStr.toIntOrNull()
-                val minorUuid = if (minorInt != null) {
-                    minorInt.toString(16).uppercase()   // 자리수 제한 없이 16진수 문자열 (대문자)
-                    String.format("%04X", minorInt)  // 4자리로 맞추려면 이 라인 사용
-                } else {
-                    ""
-                }
-
-                Log.d("ATCommand", "AT+BEACON=${companyId},${majorUuid},${minorUuid},${customUuid},0")
-
-                if (companyId.isEmpty() || majorUuid.isEmpty() || minorUuid.isEmpty() || customUuid.isEmpty()) {
-                    SendPromptMsg("Empty Field!\n")
-                    mStartFlag = false
-                    return@setPositiveButton
-                } else {
-                    Log.d(
-                        "ATCommand",
-                        "AT+BEACON=${companyId},${majorUuid},${minorUuid},${customUuid},0"
-                    )
-                }
-
-                Thread {
-                    val beacon = Beacon(companyId, majorUuid, minorUuid, customUuid)
-                    val ret = At.Lib_SetBeaconParams(beacon)
-                    if (ret == 0) {
-                        SendPromptMsg(
-                            "Config beacon succeeded!\n" +
-                                    "Company ID: 0x${beacon.companyId}\n" +
-                                    "Major: 0x${beacon.major}\n" +
-                                    "Minor: 0x${beacon.minor}\n" +
-                                    "Custom UUID: 0x${beacon.customUuid}\n"
-                        )
-                        val scanEditor = scanSp.edit()
-                        scanEditor.putString("broadcastName", broadcastName)
-                        scanEditor.apply()
-                        
-                        val editor = sp.edit()
-                        editor.putString("companyId", companyId)
-                        editor.putString("majorUuid", majorUuid)
-                        editor.putString("minorUuid", minorUuid)
-                        editor.putString("customUuid", customUuid)
-                        editor.putString("displayTitle", selectedDisplayTitle) // Display Title 저장
-                        editor.apply()
-                        
-                        // UI 업데이트는 메인 스레드에서 실행
-                        runOnUiThread {
-                            adapter.updateDisplayMode(selectedDisplayTitle)
-                            Log.d("MainActivity", "Display Title saved: $selectedDisplayTitle")
-                        }
-                    } else {
-                        SendPromptMsg("Config beacon failed, return: $ret\n")
-                    }
-                    mStartFlag = false
-                }.start()
+                // UI 업데이트
+                adapter.updateDisplayMode(selectedDisplayTitle)
+                Log.d("MainActivity", "Settings saved: broadcastName=$broadcastName, displayTitle=$selectedDisplayTitle")
+                SendPromptMsg("설정이 저장되었습니다.")
+                mStartFlag = false
             }
             .setNegativeButton("Cancel") { _, _ ->
                 SendPromptMsg("Cancel Config Beacon.\n")

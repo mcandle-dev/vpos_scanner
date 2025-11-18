@@ -130,6 +130,30 @@ class BLEDeviceAdapter(
             holder.deviceRssiTextView.setTextColor(defaultColor)
             holder.deviceRssiIcon.setColorFilter(defaultColor, PorterDuff.Mode.SRC_IN)
         }
+
+        // 연결 상태에 따른 배경색 변경
+        updateConnectionBackground(holder.itemView, device)
+    }
+
+    /**
+     * 연결 상태에 따른 배경색 업데이트
+     */
+    private fun updateConnectionBackground(itemView: View, device: DeviceModel) {
+        val context = itemView.context
+        when (device.connectionState) {
+            ConnectionState.CONNECTED -> {
+                itemView.setBackgroundColor(ContextCompat.getColor(context, android.R.color.holo_green_light))
+            }
+            ConnectionState.CONNECTING -> {
+                itemView.setBackgroundColor(ContextCompat.getColor(context, android.R.color.holo_orange_light))
+            }
+            ConnectionState.ERROR -> {
+                itemView.setBackgroundColor(ContextCompat.getColor(context, android.R.color.holo_red_light))
+            }
+            else -> {
+                itemView.setBackgroundColor(ContextCompat.getColor(context, android.R.color.white))
+            }
+        }
     }
 
     private fun bindMembershipDevice(holder: MembershipViewHolder, device: DeviceModel) {
@@ -155,6 +179,9 @@ class BLEDeviceAdapter(
             holder.rssiValueTextView.setTextColor(defaultColor)
             holder.rssiIcon.setColorFilter(defaultColor, PorterDuff.Mode.SRC_IN)
         }
+
+        // 연결 상태에 따른 배경색 변경
+        updateConnectionBackground(holder.itemView, device)
     }
 
     override fun getItemCount() = deviceList.size
