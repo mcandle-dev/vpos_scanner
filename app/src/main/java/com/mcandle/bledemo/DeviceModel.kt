@@ -3,6 +3,18 @@ package com.mcandle.bledemo
 import java.util.*
 
 /**
+ * 연결 상태
+ */
+enum class ConnectionState {
+    DISCONNECTED,   // 연결 안됨
+    CONNECTING,     // 연결 중
+    CONNECTED,      // 연결됨
+    SENDING,        // 데이터 송신 중
+    RECEIVING,      // 데이터 수신 중
+    ERROR           // 오류
+}
+
+/**
  * BLE 장치 정보를 저장하는 데이터 클래스
  */
 data class DeviceModel(
@@ -13,7 +25,12 @@ data class DeviceModel(
     var serviceUuids: String = "",  // 단일 UUID (문자열)
     var serviceData:  String = "", // 단일 서비스 데이터 (문자열)
     var manufacturerData: String = "", // 단일 제조사 데이터 (문자열)
-    var timestampNanos: Long = System.nanoTime() // 스캔된 시점의 타임스탬프
+    var timestampNanos: Long = System.nanoTime(), // 스캔된 시점의 타임스탬프
+
+    // 연결 상태 관련 필드
+    var connectionHandle: Int? = null,   // 연결 Handle
+    var isConnected: Boolean = false,    // 연결 여부
+    var connectionState: ConnectionState = ConnectionState.DISCONNECTED  // 연결 상태
 ) {
     /** 제조사 데이터를 HEX 문자열로 반환 */
     fun getManufacturerDataHex(): String {
