@@ -21,6 +21,9 @@ class BleConnection(private val context: Context) {
 
         // 버퍼 크기
         private const val BUFFER_SIZE = 2048
+
+        // 테스트 모드 (true로 설정하면 Mock 응답 사용)
+        var TEST_MODE = false
     }
 
     // 연결 상태
@@ -49,6 +52,15 @@ class BleConnection(private val context: Context) {
      */
     fun connectToDevice(macAddress: String): ConnectionResult {
         Log.d(TAG, "Connecting to device: $macAddress")
+
+        // 테스트 모드
+        if (TEST_MODE) {
+            Log.d(TAG, "[TEST MODE] Simulating connection to $macAddress")
+            Thread.sleep(1000) // 연결 시뮬레이션
+            connectedHandle = 1
+            targetMacAddress = macAddress
+            return ConnectionResult.Success(1)
+        }
 
         try {
             // AT+CONNECT 명령 전송
@@ -184,6 +196,13 @@ class BleConnection(private val context: Context) {
 
         Log.d(TAG, "Sending data: ${data.size} bytes")
 
+        // 테스트 모드
+        if (TEST_MODE) {
+            Log.d(TAG, "[TEST MODE] Simulating send: ${String(data)}")
+            Thread.sleep(500)
+            return SendResult.Success
+        }
+
         try {
             // 1. AT+SEND 명령으로 송신 준비
             val sendCmd = "AT+SEND=$handle,${data.size},$timeout\r\n"
@@ -250,6 +269,19 @@ class BleConnection(private val context: Context) {
 
         Log.d(TAG, "Waiting for data, timeout: $timeout ms")
 
+        // 테스트 모드
+        if (TEST_MODE) {
+            Thread.sleep(timeout.toLong())
+            // 랜덤하게 데이터 수신 시뮬레이션
+            return if (Math.random() > 0.7) {
+                val testData = "TEST_RESPONSE_${System.currentTimeMillis()}"
+                Log.d(TAG, "[TEST MODE] Simulating receive: $testData")
+                ReceiveResult.Success(testData.toByteArray())
+            } else {
+                ReceiveResult.Timeout
+            }
+        }
+
         try {
             val response = ByteArray(BUFFER_SIZE)
             val recvLen = IntArray(1)
@@ -289,6 +321,15 @@ class BleConnection(private val context: Context) {
         val handle = connectedHandle ?: return true  // 이미 연결 안됨
 
         Log.d(TAG, "Disconnecting handle: $handle")
+
+        // 테스트 모드
+        if (TEST_MODE) {
+            Log.d(TAG, "[TEST MODE] Simulating disconnect")
+            Thread.sleep(300)
+            connectedHandle = null
+            targetMacAddress = null
+            return true
+        }
 
         try {
             val disconnectCmd = "AT+DISCE=$handle\r\n"
