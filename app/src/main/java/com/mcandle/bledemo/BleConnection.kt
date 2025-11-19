@@ -46,6 +46,61 @@ class BleConnection(private val context: Context) {
     fun isConnected(): Boolean = connectedHandle != null
 
     /**
+     * COM 포트 열기 및 초기화
+     *
+     * @param portNo 포트 번호 (기본값: 4 = /dev/ttyS1)
+     * @return 0이면 성공, 음수면 실패
+     *
+     * 내부적으로 다음 설정이 적용됨:
+     * - baudrate: 115200
+     * - data_bits: 8
+     * - parity: N (None)
+     * - stop_bits: 1
+     */
+    fun openComPort(portNo: Int = 4): Int {
+        Log.d(TAG, "Opening COM port: $portNo")
+
+        // 테스트 모드
+        if (TEST_MODE) {
+            Log.d(TAG, "[TEST MODE] Simulating COM port open")
+            return 0
+        }
+
+        try {
+            val result = At.Lib_ComOpen(portNo)
+            Log.i(TAG, "Lib_ComOpen($portNo) result: $result")
+            return result
+        } catch (e: Exception) {
+            Log.e(TAG, "COM port open exception", e)
+            return -1
+        }
+    }
+
+    /**
+     * COM 포트 닫기
+     *
+     * @return 0이면 성공, 음수면 실패
+     */
+    fun closeComPort(): Int {
+        Log.d(TAG, "Closing COM port")
+
+        // 테스트 모드
+        if (TEST_MODE) {
+            Log.d(TAG, "[TEST MODE] Simulating COM port close")
+            return 0
+        }
+
+        try {
+            val result = At.Lib_ComClose()
+            Log.i(TAG, "Lib_ComClose() result: $result")
+            return result
+        } catch (e: Exception) {
+            Log.e(TAG, "COM port close exception", e)
+            return -1
+        }
+    }
+
+    /**
      * Master 모드 활성화 (At.Lib_EnableMaster 없이 직접 AT Command 사용)
      *
      * 내부 동작:
