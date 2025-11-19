@@ -46,6 +46,239 @@ class BleConnection(private val context: Context) {
     fun isConnected(): Boolean = connectedHandle != null
 
     /**
+     * Master 모드 활성화 (At.Lib_EnableMaster 없이 직접 AT Command 사용)
+     *
+     * 내부 동작:
+     * 1. AT+OBSERVER=0 (기존 스캔 중지)
+     * 2. AT+EXIT (AT 모드 종료)
+     * 3. +++ (AT 모드 재진입)
+     * 4. AT+ROLE=1 (Master 모드 설정)
+     *
+     * @return MasterModeResult
+     */
+    fun enableMasterMode(): MasterModeResult {
+        Log.d(TAG, "Enabling Master Mode via direct AT commands")
+
+        // 테스트 모드
+        if (TEST_MODE) {
+            Log.d(TAG, "[TEST MODE] Simulating enable master mode")
+            Thread.sleep(500)
+            return MasterModeResult.Success
+        }
+
+        try {
+            // 1. AT+OBSERVER=0 (기존 스캔 중지)
+            var result = sendAtCommand("AT+OBSERVER=0\r\n", DEFAULT_TIMEOUT)
+            if (result is AtCommandResult.Error) {
+                Log.w(TAG, "AT+OBSERVER=0 failed, continuing...")
+            } else {
+                Log.i(TAG, "AT+OBSERVER=0 OK")
+            }
+
+            // 2. AT+EXIT (AT 모드 종료)
+            result = sendAtCommand("AT+EXIT\r\n", DEFAULT_TIMEOUT)
+            if (result is AtCommandResult.Error) {
+                Log.w(TAG, "AT+EXIT failed, continuing...")
+            } else {
+                Log.i(TAG, "AT+EXIT OK")
+            }
+
+            // 3. +++ (AT 모드 재진입)
+            result = sendAtCommand("+++", DEFAULT_TIMEOUT)
+            if (result is AtCommandResult.Error) {
+                Log.w(TAG, "+++ failed, continuing...")
+            } else {
+                Log.i(TAG, "+++ OK")
+            }
+
+            // 4. AT+ROLE=1 (Master 모드 설정)
+            result = sendAtCommand("AT+ROLE=1\r\n", DEFAULT_TIMEOUT)
+            if (result is AtCommandResult.Success) {
+                Log.i(TAG, "AT+ROLE=1 OK - Master mode enabled")
+                return MasterModeResult.Success
+            }
+
+            // AT+ROLE=1 실패시 AT+ROLE? 로 현재 상태 확인
+            result = sendAtCommand("AT+ROLE?\r\n", DEFAULT_TIMEOUT)
+            if (result is AtCommandResult.Success && result.response.contains("1")) {
+                Log.i(TAG, "Already in Master mode")
+                return MasterModeResult.Success
+            }
+
+            return MasterModeResult.Error("Master 모드 설정 실패")
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Enable master mode exception", e)
+            return MasterModeResult.Error("예외 발생: ${e.message}")
+        }
+    }
+
+    /**
+     * Master 모드 비활성화 (Beacon/Slave 모드로 전환)
+     *
+     * @return MasterModeResult
+     */
+    fun disableMasterMode(): MasterModeResult {
+        Log.d(TAG, "Disabling Master Mode via direct AT commands")
+
+        // 테스트 모드
+        if (TEST_MODE) {
+            Log.d(TAG, "[TEST MODE] Simulating disable master mode")
+            Thread.sleep(500)
+            return MasterModeResult.Success
+        }
+
+        try {
+            // AT+ROLE=0 (Slave/Beacon 모드 설정)
+            val result = sendAtCommand("AT+ROLE=0\r\n", DEFAULT_TIMEOUT)
+            if (result is AtCommandResult.Success) {
+                Log.i(TAG, "AT+ROLE=0 OK - Slave mode enabled")
+                return MasterModeResult.Success
+            }
+
+            return MasterModeResult.Error("Slave 모드 설정 실패")
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Disable master mode exception", e)
+            return MasterModeResult.Error("예외 발생: ${e.message}")
+        }
+    }
+
+    /**
+     * BLE 스캔 시작 (At.Lib_AtStartNewScan 없이 직접 AT Command 사용)
+     *
+     * @param broadcastName 필터링할 브로드캐스트 이름 (빈 문자열이면 필터 없음)
+     * @param rssiFilter RSSI 필터 값 (0이면 필터 없음)
+     * @return AtCommandResult
+     */
+    fun startScan(broadcastName: String = "", rssiFilter: Int = 0): AtCommandResult {
+        Log.d(TAG, "Starting BLE scan via direct AT command")
+
+        // 테스트 모드
+        if (TEST_MODE) {
+            Log.d(TAG, "[TEST MODE] Simulating start scan")
+            Thread.sleep(300)
+            return AtCommandResult.Success("OK")
+        }
+
+        try {
+            // AT+OBSERVER=1,스캔타입,,브로드캐스트명,RSSI필터,,
+            // 예: AT+OBSERVER=1,2,,Mcan,0,,
+            val scanCmd = "AT+OBSERVER=1,2,,$broadcastName,$rssiFilter,,\r\n"
+            return sendAtCommand(scanCmd, DEFAULT_TIMEOUT)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Start scan exception", e)
+            return AtCommandResult.Error("스캔 시작 예외: ${e.message}")
+        }
+    }
+
+    /**
+     * BLE 스캔 중지
+     *
+     * @return AtCommandResult
+     */
+    fun stopScan(): AtCommandResult {
+        Log.d(TAG, "Stopping BLE scan via direct AT command")
+
+        // 테스트 모드
+        if (TEST_MODE) {
+            Log.d(TAG, "[TEST MODE] Simulating stop scan")
+            Thread.sleep(200)
+            return AtCommandResult.Success("OK")
+        }
+
+        try {
+            return sendAtCommand("AT+OBSERVER=0\r\n", DEFAULT_TIMEOUT)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Stop scan exception", e)
+            return AtCommandResult.Error("스캔 중지 예외: ${e.message}")
+        }
+    }
+
+    /**
+     * AT Command 전송 및 응답 수신
+     *
+     * @param command AT 명령어
+     * @param timeout 타임아웃 (ms)
+     * @return AtCommandResult
+     */
+    fun sendAtCommand(command: String, timeout: Int = DEFAULT_TIMEOUT): AtCommandResult {
+        try {
+            val cmdBytes = command.toByteArray()
+
+            Log.i(TAG, ">>> SEND CMD: ${command.trim()}")
+            Log.i(TAG, ">>> SEND HEX: ${bytesToHex(cmdBytes)}")
+
+            val sendResult = At.Lib_ComSend(cmdBytes, cmdBytes.size)
+            Log.i(TAG, ">>> SEND Result: $sendResult")
+
+            if (sendResult < 0) {
+                Log.e(TAG, "Failed to send command: $sendResult")
+                return AtCommandResult.Error("명령 전송 실패: $sendResult")
+            }
+
+            // 응답 수신
+            val response = ByteArray(BUFFER_SIZE)
+            val recvLen = IntArray(1)
+            val recvResult = At.Lib_ComRecvAT(response, recvLen, timeout / 50, timeout)
+
+            Log.i(TAG, "<<< RECV Result: $recvResult, len=${recvLen[0]}")
+
+            if (recvLen[0] > 0) {
+                val responseStr = String(response, 0, recvLen[0]).trim()
+                Log.i(TAG, "<<< RECV STR: $responseStr")
+                Log.i(TAG, "<<< RECV HEX: ${bytesToHex(response.copyOf(recvLen[0]))}")
+
+                return if (responseStr.contains("OK") || responseStr.contains("CONNECTED")) {
+                    AtCommandResult.Success(responseStr)
+                } else if (responseStr.contains("ERROR")) {
+                    AtCommandResult.Error("ERROR 응답: $responseStr")
+                } else {
+                    AtCommandResult.Success(responseStr)
+                }
+            }
+
+            if (recvResult < 0) {
+                return AtCommandResult.Error("응답 수신 실패: $recvResult")
+            }
+
+            return AtCommandResult.Timeout
+
+        } catch (e: Exception) {
+            Log.e(TAG, "sendAtCommand exception", e)
+            return AtCommandResult.Error("예외: ${e.message}")
+        }
+    }
+
+    /**
+     * 스캔 데이터 수신 (연속 수신용)
+     *
+     * @param timeout 타임아웃 (ms)
+     * @return 수신된 데이터 문자열 또는 null
+     */
+    fun receiveScanData(timeout: Int = DEFAULT_TIMEOUT): String? {
+        try {
+            val response = ByteArray(BUFFER_SIZE)
+            val recvLen = IntArray(1)
+            val recvResult = At.Lib_ComRecvAT(response, recvLen, timeout / 50, timeout)
+
+            if (recvLen[0] > 0) {
+                val responseStr = String(response, 0, recvLen[0])
+                Log.d(TAG, "<<< SCAN DATA: ${responseStr.trim()}")
+                return responseStr
+            }
+
+            return null
+
+        } catch (e: Exception) {
+            Log.e(TAG, "receiveScanData exception", e)
+            return null
+        }
+    }
+
+    /**
      * 현재 연결된 Handle 반환
      */
     fun getConnectionHandle(): Int? = connectedHandle
@@ -516,4 +749,21 @@ sealed class ReceiveResult {
     data class Success(val data: ByteArray) : ReceiveResult()
     object Timeout : ReceiveResult()
     data class Error(val message: String) : ReceiveResult()
+}
+
+/**
+ * Master 모드 결과
+ */
+sealed class MasterModeResult {
+    object Success : MasterModeResult()
+    data class Error(val message: String) : MasterModeResult()
+}
+
+/**
+ * AT Command 결과
+ */
+sealed class AtCommandResult {
+    data class Success(val response: String) : AtCommandResult()
+    object Timeout : AtCommandResult()
+    data class Error(val message: String) : AtCommandResult()
 }
